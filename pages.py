@@ -2328,18 +2328,12 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                 </div>
             `).join('');
 
-            // Attach change listeners to IP checkboxes for dynamic button state
-            container.querySelectorAll('.suggest-ip-checkbox').forEach(cb => {
-                cb.addEventListener('change', updateSuggestApplyButton);
-            });
+            // No need to attach listeners to IP checkboxes – the button state depends on target selection
 
             await loadApplyTargetsForSuggest();
+            // updateSuggestApplyButton() is called inside loadApplyTargetsForSuggest
 
-            // 🔥 FIX: Use setTimeout to ensure DOM is fully updated before enabling button
-            setTimeout(() => {
-                updateSuggestApplyButton();
-                document.getElementById('applyStatus').textContent = `${currentSuggestedIPs.length} IP(s) loaded`;
-            }, 50);
+            document.getElementById('applyStatus').textContent = `${currentSuggestedIPs.length} IP(s) loaded`;
 
         } catch (e) {
             console.error('Fetch suggestions error:', e);
@@ -2353,10 +2347,12 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
             const data = await res.json();
             const links = data.links || [];
             const container = document.getElementById('applyTargetList');
+            const applyBtn = document.getElementById('applySuggestBtn');
 
             if (!links.length) {
-                container.innerHTML = '<p class="text-[11px] text-slate-500 font-english">No configs — a new one will be created automatically.</p>';
-                // No need to disable button; updateSuggestApplyButton will handle it
+                container.innerHTML = '<p class="text-[11px] text-slate-500 font-english">No configs available — please create one first.</p>';
+                applyBtn.disabled = true;
+                document.getElementById('applyStatus').textContent = 'No configs to apply to';
                 return;
             }
 
@@ -2368,22 +2364,32 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                 </label>
             `).join('');
 
-            // Listeners for target checkboxes (optional)
+            // Attach change listeners to target checkboxes
             container.querySelectorAll('.suggest-target-checkbox').forEach(cb => {
                 cb.addEventListener('change', updateSuggestApplyButton);
             });
 
+            // Initial button state
+            updateSuggestApplyButton();
         } catch (e) {
             console.error('Load targets error:', e);
         }
     }
 
-    // ===== FIXED: Enable button based on IP selection =====
+    // ===== FIXED: Enable button based on target selection =====
     function updateSuggestApplyButton() {
-        const ipCheckboxes = document.querySelectorAll('.suggest-ip-checkbox:checked');
+        const targetCheckboxes = document.querySelectorAll('.suggest-target-checkbox:checked');
         const applyBtn = document.getElementById('applySuggestBtn');
-        applyBtn.disabled = (ipCheckboxes.length === 0);
-        console.log('IP checkboxes checked:', ipCheckboxes.length, 'Button disabled:', applyBtn.disabled);
+        const hasTargets = document.querySelectorAll('.suggest-target-checkbox').length > 0;
+
+        // If there are no target checkboxes at all, disable the button
+        if (!hasTargets) {
+            applyBtn.disabled = true;
+            return;
+        }
+
+        // Enable only if at least one target is selected
+        applyBtn.disabled = (targetCheckboxes.length === 0);
     }
 
     async function applySuggestedIPs() {
@@ -2395,12 +2401,18 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
             return;
         }
 
-        // Get target configs (may be empty)
+        // Get target configs
         const targetCheckboxes = document.querySelectorAll('.suggest-target-checkbox:checked');
         const targetUUIDs = Array.from(targetCheckboxes).map(cb => cb.value);
 
+        // ✅ Check: at least one config must be selected
+        if (targetUUIDs.length === 0) {
+            toast('Please select at least one config to apply the IPs to', 'error');
+            return;
+        }
+
         const confirmApply = await customConfirm(
-            `Apply ${selectedIPs.length} IP(s) to ${targetUUIDs.length || 'a new'} config(s)?`
+            `Apply ${selectedIPs.length} IP(s) to ${targetUUIDs.length} config(s)?`
         );
         if (!confirmApply) return;
 
