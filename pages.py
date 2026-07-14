@@ -1,7 +1,4 @@
-# pages.py - MX-UI v1.0.0
-# All templates with escaped braces for Python .format()
 
-# ---------- LOGIN_HTML ----------
 LOGIN_HTML = r"""<!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -2392,7 +2389,7 @@ function renderDomainStatus() {
                     <p class="text-sm font-bold font-english">⚠️ Railway Default Domain Detected</p>
                     <p class="text-xs text-slate-400 mt-1 font-english">
                         You cannot use IP Suggestions with a Railway default domain.
-                        Please use a custom domain (e.g., <span class="text-cyan-400 font-mono">railway1.cameliaam.ir</span>).
+                        Please use a custom domain (e.g., <span class="text-cyan-400 font-mono">custom.com</span>).
                     </p>
                     <p class="text-[10px] text-slate-500 mt-1 font-english">Current host: <span class="font-mono">${host}</span></p>
                 </div>
@@ -3225,6 +3222,28 @@ SUB_USER_HTML = r"""<!DOCTYPE html>
         .copy-btn:active {
             transform: scale(0.95);
         }
+        .copy-all-btn {
+            transition: all 0.2s ease;
+            font-size: 10px;
+            padding: 4px 12px;
+            border-radius: 8px;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            cursor: pointer;
+        }
+        .copy-all-btn:hover {
+            background: rgba(59, 130, 246, 0.25);
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+        .copy-all-btn:active {
+            transform: scale(0.95);
+        }
+        .copy-all-btn.copied {
+            background: rgba(52, 211, 153, 0.15);
+            color: #34d399;
+            border-color: rgba(52, 211, 153, 0.2);
+        }
         .progress-bar-fill {
             transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -3410,7 +3429,7 @@ SUB_USER_HTML = r"""<!DOCTYPE html>
         
         /* ===== FIX: Show all links without scroll ===== */
         .scroll-links {
-            max-height: none;  /* بدون محدودیت ارتفاع - همه آیتم‌ها نمایش داده می‌شوند */
+            max-height: none;
             overflow-y: visible;
             overflow-x: hidden;
         }
@@ -3586,12 +3605,15 @@ SUB_USER_HTML = r"""<!DOCTYPE html>
                     <span class="detail-label text-[10px] sm:text-xs text-slate-400 font-medium uppercase tracking-wider font-english">Expiry</span>
                     <span class="detail-value text-xs sm:text-sm font-mono text-rose-300 font-semibold font-english" id="expiryValue">%%EXPIRY%%</span>
                 </div>
-            
+                <div class="detail-row flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 px-1 rounded-lg gap-1 sm:gap-0">
+                    <span class="detail-label text-[10px] sm:text-xs text-slate-400 font-medium uppercase tracking-wider font-english">IP(s) Connected</span>
+                    <span class="detail-value text-xs sm:text-sm font-mono text-cyan-300 font-english" id="ipsValue">%%IPS%%</span>
+                </div>
             </div>
 
             <!-- ===== LINKS SECTION ===== -->
             <div class="mt-5 sm:mt-6">
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
                     <p class="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider font-bold flex items-center gap-2 font-english">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
@@ -3599,9 +3621,18 @@ SUB_USER_HTML = r"""<!DOCTYPE html>
                         </svg>
                         Connection Links
                     </p>
-                    <span class="badge-ips font-english">%%APPLIED_IPS_COUNT%% IP variant(s)</span>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="badge-ips font-english">%%APPLIED_IPS_COUNT%% IP variant(s)</span>
+                        <button onclick="copyAllLinks()" id="copyAllBtn" class="copy-all-btn font-english">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 inline mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                            Copy All
+                        </button>
+                    </div>
                 </div>
-                <div class="bg-slate-950/60 border border-slate-800/60 rounded-xl overflow-hidden scroll-links">
+                <div class="bg-slate-950/60 border border-slate-800/60 rounded-xl overflow-hidden scroll-links" id="linksContainer">
                     %%LINKS_LIST_HTML%%
                 </div>
             </div>
@@ -3836,6 +3867,79 @@ SUB_USER_HTML = r"""<!DOCTYPE html>
             isPaused = false;
             timerLastTick = Date.now();
             startTimer();
+        }
+
+        // ===== COPY ALL LINKS FUNCTION =====
+        function copyAllLinks() {
+            const linkRows = document.querySelectorAll('.link-row');
+            if (!linkRows.length) {
+                showToast('No links to copy', 'error');
+                return;
+            }
+            
+            // Collect all VLESS links from the hidden input fields
+            const links = [];
+            linkRows.forEach(row => {
+                const input = row.querySelector('input[type="text"]');
+                if (input && input.value) {
+                    links.push(input.value);
+                }
+            });
+            
+            if (!links.length) {
+                showToast('No links found', 'error');
+                return;
+            }
+            
+            const allLinksText = links.join('\n');
+            
+            // Copy to clipboard
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(allLinksText).then(() => {
+                    showToast(`${links.length} links copied!`, 'success');
+                    const btn = document.getElementById('copyAllBtn');
+                    btn.classList.add('copied');
+                    btn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 inline mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        Copied!
+                    `;
+                    setTimeout(() => {
+                        btn.classList.remove('copied');
+                        btn.innerHTML = `
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 inline mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                            Copy All
+                        `;
+                    }, 2000);
+                }).catch(() => {
+                    fallbackCopyAll(links);
+                });
+            } else {
+                fallbackCopyAll(links);
+            }
+        }
+
+        function fallbackCopyAll(links) {
+            const text = links.join('\n');
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            textarea.style.left = '-9999px';
+            textarea.style.top = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast(`${links.length} links copied!`, 'success');
+            } catch (e) {
+                showToast('Failed to copy links', 'error');
+            }
+            document.body.removeChild(textarea);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
