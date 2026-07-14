@@ -35,7 +35,7 @@ IRAN_TZ = ZoneInfo("Asia/Tehran")
 
 app = FastAPI(title="MX-UI", docs_url=None, redoc_url=None)
 
-# ===== Emojis =====
+# ===== Emojis (decorative and limit) =====
 DECORATIVE_EMOJIS = ["🌸", "🌺", "🌻", "🌹", "🌷", "🌿", "🍀", "🌴", "🌳", "🎋",
                      "💎", "🌟", "✨", "🎯", "🏆", "🔥", "💨", "🚀", "⭐", "💫",
                      "🌈", "⚡", "🎉", "🎊", "💝", "🌊", "🍃"]
@@ -107,6 +107,7 @@ async def load_state():
                 for key, value in data["paths"].items():
                     if key in CONFIG:
                         CONFIG[key] = value
+
             logger.info(f"State loaded: {len(LINKS)} links")
     except Exception as e:
         logger.warning(f"Could not load state: {e}")
@@ -150,7 +151,7 @@ LINKS_LOCK = asyncio.Lock()
 PROTOCOLS = ("vless-ws", "xhttp-packet-up", "xhttp-stream-up")
 DEFAULT_PROTOCOL = "vless-ws"
 FINGERPRINTS = ("chrome", "firefox", "safari", "ios", "android", "edge", "360", "qq", "random", "randomized")
-DEFAULT_FINGERPRINT = "chrome"
+DEFAULT_FINGERPRINT = "ios"  # تغییر از "chrome" به "ios"
 DEFAULT_ALPN_BY_PROTOCOL = {
     "vless-ws": "http/1.1",
     "xhttp-packet-up": "h2,http/1.1",
@@ -328,7 +329,7 @@ async def shutdown():
         await http_client.aclose()
 
 def get_host(request: Optional[Request] = None) -> str:
-    """همیشه دامنه‌ی واقعی را از هدر درخواست می‌خواند"""
+    # Always read from request headers first for the actual domain
     if request is not None:
         h = request.headers.get("x-forwarded-host") or request.headers.get("host")
         if h:
@@ -518,7 +519,7 @@ async def ensure_default_link():
                     "note": "",
                     "is_default": True,
                     "protocol": DEFAULT_PROTOCOL,
-                    "fingerprint": DEFAULT_FINGERPRINT,
+                    "fingerprint": "ios",  # ios default
                     "alpn": "",
                     "ip_limit": 0,
                     "speed_limit_bytes": DEFAULT_SPEED_LIMIT,
@@ -1397,16 +1398,11 @@ async def apply_ips(request: Request, _=Depends(require_auth)):
         log_activity("ips", f"Applied {len(new_ips)} IPs to {len(applied)} config(s)", "ok")
     return {"ok": True, "applied": applied}
 
-# ===== DOMAIN CHECK (FIXED: reads from request, detects any railway domain) =====
+# ===== DOMAIN CHECK (Simple - just reads from request) =====
 @app.get("/api/domain/check")
 async def check_domain(request: Request, _=Depends(require_auth)):
-    # دامنه‌ای که کاربر در مرورگر وارد کرده است
     host = get_host(request)
-    
-    # بررسی می‌کنیم که آیا دامنه شامل railway.app یا up.railway.app هست یا نه
-    # این روش هر دامنه‌ای که حاوی این عبارات باشد را تشخیص می‌دهد
     is_railway = "railway.app" in host or "up.railway.app" in host
-    
     return {
         "host": host,
         "is_railway": is_railway,
