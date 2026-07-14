@@ -35,7 +35,7 @@ IRAN_TZ = ZoneInfo("Asia/Tehran")
 
 app = FastAPI(title="MX-UI", docs_url=None, redoc_url=None)
 
-# ===== Emojis (keeping decorative and limit emojis, removing country) =====
+# ===== Emojis (decorative and limit) =====
 DECORATIVE_EMOJIS = ["🌸", "🌺", "🌻", "🌹", "🌷", "🌿", "🍀", "🌴", "🌳", "🎋",
                      "💎", "🌟", "✨", "🎯", "🏆", "🔥", "💨", "🚀", "⭐", "💫",
                      "🌈", "⚡", "🎉", "🎊", "💝", "🌊", "🍃"]
@@ -107,6 +107,28 @@ async def load_state():
                 for key, value in data["paths"].items():
                     if key in CONFIG:
                         CONFIG[key] = value
+
+            # ===== Host change detection: clear all ip_pool if host changed =====
+            last_host = data.get("last_host")
+            current_host = CONFIG["host"]
+            # Only act if we have a meaningful host (not localhost or 127.0.0.1)
+            if last_host and last_host != current_host and current_host not in ("localhost", "127.0.0.1"):
+                logger.info(f"Host changed from {last_host} to {current_host}. Clearing all ip_pool entries.")
+                for uid in LINKS:
+                    LINKS[uid]["ip_pool"] = []
+                log_activity("system", f"Host changed to {current_host}, cleared IP pools", "warn")
+                data["last_host"] = current_host
+                # Save the updated state
+                async with aiofiles.open(DATA_FILE, "w", encoding="utf-8") as f:
+                    await f.write(json.dumps(data, ensure_ascii=False, indent=2))
+                logger.info("Saved state after clearing IP pools due to host change.")
+            elif not last_host:
+                # First run: set last_host
+                data["last_host"] = current_host
+                async with aiofiles.open(DATA_FILE, "w", encoding="utf-8") as f:
+                    await f.write(json.dumps(data, ensure_ascii=False, indent=2))
+                logger.info(f"Initialized last_host to {current_host}.")
+
             logger.info(f"State loaded: {len(LINKS)} links")
     except Exception as e:
         logger.warning(f"Could not load state: {e}")
@@ -124,7 +146,8 @@ async def save_state():
                     "login_path": CONFIG.get("login_path", "/login"),
                     "sub_path": CONFIG.get("sub_path", "/sub"),
                     "setup_path": CONFIG.get("setup_path", "/setup"),
-                }
+                },
+                "last_host": CONFIG["host"],
             }
             tmp = DATA_FILE.with_suffix(".tmp")
             async with aiofiles.open(tmp, "w", encoding="utf-8") as f:
@@ -212,7 +235,6 @@ async def require_auth(request: Request):
     return token
 
 def get_client_ip(request: Request) -> str:
-    # اولویت با هدر CF-Connecting-IP (مخصوص کلادفلر)
     cf_ip = request.headers.get("CF-Connecting-IP")
     if cf_ip:
         return cf_ip.strip()
@@ -224,14 +246,11 @@ def get_client_ip(request: Request) -> str:
         return real_ip.strip()
     return request.client.host if request.client else "127.0.0.1"
 
-# این تابع دیگر در ساخت لیبل استفاده نمی‌شود، اما برای موارد دیگر ممکن است نیاز باشد
-# (مثلاً لاگ‌ها) پس نگه می‌داریم ولی در ساخت لیبل از آن استفاده نمی‌کنیم.
+# Not used for labels, but kept for compatibility
 async def get_client_country(request: Request) -> tuple[str, str]:
-    # اول از هدر کلادفلر استفاده کن
     cf_country = request.headers.get("CF-IPCountry")
     if cf_country:
-        return cf_country.upper(), "🌍"  # ایموجی را می‌توان از دیکشنری گرفت ولی برای ما مهم نیست
-    # در غیر این صورت از آی‌پی استفاده کن
+        return cf_country.upper(), "🌍"
     ip_address = get_client_ip(request)
     async with IP_CACHE_LOCK:
         if ip_address in IP_CACHE:
@@ -246,7 +265,7 @@ async def get_client_country(request: Request) -> tuple[str, str]:
                 if data.get("status") == "success":
                     country = data.get("country", "Unknown")
                     country_code = data.get("countryCode", "XX")
-                    emoji = "🌍"  # دیگر ایموجی کشور را نگه نمی‌داریم
+                    emoji = "🌍"
                     async with IP_CACHE_LOCK:
                         IP_CACHE[ip_address] = (time.time(), country, emoji)
                     return country, emoji
@@ -287,7 +306,6 @@ def format_limit(limit_bytes: int) -> tuple[str, str]:
         display = f"{kb:.0f} KB"
         return "📦", display
 
-# تابع جدید بدون country_emoji
 def generate_emoji_label(base_label: str, limit_bytes: int, speed_limit_bytes: int) -> str:
     import re
     clean_label = re.sub(r'[^a-zA-Z\s\-\.]', '', base_label).strip()
@@ -501,7 +519,7 @@ def is_ip_allowed(link: dict | None, uuid: str, ip: str) -> bool:
     return len(ips) < limit
 
 def client_ip(request: Request) -> str:
-    return get_client_ip(request)  # استفاده از تابع جدید
+    return get_client_ip(request)
 
 _default_link_created = False
 
@@ -515,7 +533,7 @@ async def ensure_default_link():
             uid = f"{uid[:8]}-{uid[8:12]}-{uid[12:16]}-{uid[16:20]}-{uid[20:32]}"
             if uid not in LINKS:
                 LINKS[uid] = {
-                    "label": "♾️ Default Link ∞ 🐢",  # بدون کشور
+                    "label": "♾️ Default Link ∞ 🐢",
                     "limit_bytes": 0,
                     "used_bytes": 0,
                     "created_at": datetime.now().isoformat(),
@@ -535,6 +553,7 @@ async def ensure_default_link():
                 asyncio.create_task(save_state())
         _default_link_created = True
 
+# ===== ROOT, HEALTH, QR, DATABASE =====
 @app.get("/")
 async def root(request: Request):
     dashboard_path = CONFIG.get("dashboard_path", "/dashboard")
@@ -628,12 +647,7 @@ async def restore_database(request: Request, _=Depends(require_auth)):
 
     return {"ok": True, "restored": len(LINKS), "requires_login": True, "password_reset": True}
 
-def render_sub_user_html(**kwargs) -> str:
-    html = SUB_USER_HTML
-    for key, value in kwargs.items():
-        html = html.replace(f"%%{key.upper()}%%", str(value))
-    return html
-
+# ===== SETUP =====
 @app.get("/setup")
 async def setup_page(request: Request):
     setup_path = CONFIG.get("setup_path", "/setup")
@@ -673,6 +687,7 @@ async def setup_admin(request: Request):
         logger.error(f"Setup error: {e}")
         raise HTTPException(status_code=500, detail="Setup failed")
 
+# ===== SUBSCRIPTION =====
 @app.get("/sub/user")
 async def subscription_user_old(request: Request, uuid: str = Query(...)):
     sub_path = CONFIG.get("sub_path", "/sub")
@@ -683,6 +698,12 @@ async def subscription_user_old(request: Request, uuid: str = Query(...)):
 @app.get(CONFIG.get("sub_path", "/sub") + "/user")
 async def subscription_user_new(request: Request, uuid: str = Query(...)):
     return await subscription_user_handler(request, uuid)
+
+def render_sub_user_html(**kwargs) -> str:
+    html = SUB_USER_HTML
+    for key, value in kwargs.items():
+        html = html.replace(f"%%{key.upper()}%%", str(value))
+    return html
 
 async def subscription_user_handler(request: Request, uuid: str):
     async with LINKS_LOCK:
@@ -723,7 +744,7 @@ async def subscription_user_handler(request: Request, uuid: str):
     uploaded = "0 B"
 
     qr_base64 = generate_qr_base64(vless, size=300)
-    
+
     all_links = build_all_vless_links(link, uuid, host)
     links_rows = []
     for i, l in enumerate(all_links):
@@ -747,7 +768,7 @@ async def subscription_user_handler(request: Request, uuid: str):
             f'</svg></button></div>'
         )
     links_list_html = "".join(links_rows) if links_rows else '<p class="text-xs text-slate-500 p-3 font-english">No links available</p>'
-    
+
     applied_ips_count = len(link.get("ip_pool") or [])
 
     return HTMLResponse(content=render_sub_user_html(
@@ -849,6 +870,7 @@ async def subscription_all_handler(request: Request):
     content = base64.b64encode("\n".join(lines).encode()).decode()
     return Response(content=content, media_type="text/plain")
 
+# ===== AUTH =====
 @app.post("/api/login")
 async def api_login(request: Request):
     if not is_setup_complete():
@@ -913,6 +935,7 @@ async def force_logout(request: Request):
     resp.delete_cookie(SESSION_COOKIE, path="/", secure=secure)
     return resp
 
+# ===== PATHS =====
 @app.get("/api/get-paths")
 async def get_paths(_=Depends(require_auth)):
     return {
@@ -998,6 +1021,7 @@ async def get_link_status(uuid: str):
         "usage_percent": 0 if limit == 0 else min(100, (used / limit) * 100)
     }
 
+# ===== STATS =====
 @app.get("/stats")
 async def get_stats(_=Depends(require_auth)):
     async with LINKS_LOCK:
@@ -1102,7 +1126,7 @@ async def get_connections(_=Depends(require_auth)):
         "raw_count": len(connections),
     }
 
-# ===== make_link و create_link بدون کشور =====
+# ===== LINK CRUD =====
 async def make_link(
     label: str = "New Link",
     limit_bytes: int = 0,
@@ -1121,7 +1145,6 @@ async def make_link(
         fingerprint = DEFAULT_FINGERPRINT
     uid = generate_uuid()
 
-    # ساخت لیبل بدون کشور
     formatted_label = generate_emoji_label(label, limit_bytes, speed_limit_bytes)
 
     async with LINKS_LOCK:
@@ -1151,7 +1174,6 @@ async def make_link(
 async def create_link(request: Request, _=Depends(require_auth)):
     body = await request.json()
 
-    # دیگر کشور را تشخیص نمی‌دهیم
     lv = float(body.get("limit_value") or 0)
     lu = body.get("limit_unit") or "GB"
     limit_bytes = 0 if lv <= 0 else parse_size_to_bytes(lv, lu)
@@ -1187,7 +1209,7 @@ async def create_link(request: Request, _=Depends(require_auth)):
         "vless_link": vless_link_for_link(link, uid, host),
         "sub_url": f"https://{host}/sub/{uid}",
         "info_url": f"https://{host}/sub/{uid}/info",
-        "country": "Unknown",  # دیگر کشور را ارسال نمی‌کنیم
+        "country": "Unknown",
     }
 
 @app.get("/api/links")
@@ -1261,7 +1283,6 @@ async def update_link(uid: str, request: Request, _=Depends(require_auth)):
             lv = float(body.get("limit_value") or 0)
             lu = body.get("limit_unit") or "GB"
             link["limit_bytes"] = 0 if lv <= 0 else parse_size_to_bytes(lv, lu)
-            # به‌روزرسانی لیبل با محدودیت جدید
             clean_label = re.sub(r'[^a-zA-Z\s\-\.]', '', label).strip()
             if not clean_label:
                 clean_label = "Config"
@@ -1291,7 +1312,6 @@ async def update_link(uid: str, request: Request, _=Depends(require_auth)):
             sv = float(body.get("speed_limit_value") or 0)
             su = body.get("speed_limit_unit") or "MBIT"
             link["speed_limit_bytes"] = 0 if sv <= 0 else parse_speed_to_bytes(sv, su)
-            # به‌روزرسانی لیبل با سرعت جدید
             clean_label = re.sub(r'[^a-zA-Z\s\-\.]', '', label).strip()
             if not clean_label:
                 clean_label = "Config"
@@ -1356,7 +1376,7 @@ async def reset_link_traffic(uid: str, _=Depends(require_auth)):
     log_activity("link", f"Traffic reset for «{label}»", "info")
     return {"ok": True, "message": f"Traffic reset for {label}"}
 
-# ===== IP SUGGESTIONS ENDPOINTS =====
+# ===== IP SUGGESTIONS =====
 @app.get("/api/ips/suggest")
 async def suggest_ips(_=Depends(require_auth)):
     ips = get_random_ips(10)
@@ -1401,7 +1421,7 @@ async def apply_ips(request: Request, _=Depends(require_auth)):
         log_activity("ips", f"Applied {len(new_ips)} IPs to {len(applied)} config(s)", "ok")
     return {"ok": True, "applied": applied}
 
-# ===== CONFIG HEALTH CHECK =====
+# ===== HEALTH CHECK =====
 _executor = ThreadPoolExecutor(max_workers=20)
 
 def _tcp_test(ip: str, port: int, timeout: float):
@@ -1465,7 +1485,7 @@ async def test_configs(request: Request, _=Depends(require_auth)):
 
     return {"results": results}
 
-# ===== PROXY AND ROUTING =====
+# ===== PROXY & WEBSOCKET =====
 from relay_vless import websocket_tunnel
 app.add_api_websocket_route("/ws/{uuid}", websocket_tunnel)
 
@@ -1493,6 +1513,7 @@ async def http_proxy(target_url: str, request: Request):
         error_logs.append({"error": str(exc), "url": target_url, "time": datetime.now().isoformat()})
         raise HTTPException(status_code=502, detail=f"Proxy error: {exc}")
 
+# ===== ROUTING =====
 @app.get("/dash")
 async def dash_redirect(request: Request):
     dashboard_path = CONFIG.get("dashboard_path", "/dashboard")
