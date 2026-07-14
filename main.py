@@ -35,7 +35,7 @@ IRAN_TZ = ZoneInfo("Asia/Tehran")
 
 app = FastAPI(title="MX-UI", docs_url=None, redoc_url=None)
 
-# ===== Emojis (decorative and limit) =====
+# ===== Emojis =====
 DECORATIVE_EMOJIS = ["🌸", "🌺", "🌻", "🌹", "🌷", "🌿", "🍀", "🌴", "🌳", "🎋",
                      "💎", "🌟", "✨", "🎯", "🏆", "🔥", "💨", "🚀", "⭐", "💫",
                      "🌈", "⚡", "🎉", "🎊", "💝", "🌊", "🍃"]
@@ -71,7 +71,6 @@ CONFIG = {
     "port": int(os.environ.get("PORT", 8000)),
     "secret": _load_or_create_secret(),
     "host": os.environ.get("RAILWAY_PUBLIC_DOMAIN", "localhost"),
-    "custom_host": None,  # custom domain set by user
     "dashboard_path": "/dashboard",
     "login_path": "/login",
     "sub_path": "/sub",
@@ -108,30 +107,6 @@ async def load_state():
                 for key, value in data["paths"].items():
                     if key in CONFIG:
                         CONFIG[key] = value
-            # Load custom_host if present
-            if "custom_host" in data:
-                CONFIG["custom_host"] = data["custom_host"]
-
-            # Host change detection: clear all ip_pool if the effective host changed
-            last_host = data.get("last_host")
-            current_host = get_host()  # using get_host which respects custom_host
-            if last_host and last_host != current_host and current_host not in ("localhost", "127.0.0.1"):
-                logger.info(f"Host changed from {last_host} to {current_host}. Clearing all ip_pool entries.")
-                for uid in LINKS:
-                    LINKS[uid]["ip_pool"] = []
-                log_activity("system", f"Host changed to {current_host}, cleared IP pools", "warn")
-                data["last_host"] = current_host
-                # Save the updated state
-                async with aiofiles.open(DATA_FILE, "w", encoding="utf-8") as f:
-                    await f.write(json.dumps(data, ensure_ascii=False, indent=2))
-                logger.info("Saved state after clearing IP pools due to host change.")
-            elif not last_host:
-                # First run: set last_host
-                data["last_host"] = current_host
-                async with aiofiles.open(DATA_FILE, "w", encoding="utf-8") as f:
-                    await f.write(json.dumps(data, ensure_ascii=False, indent=2))
-                logger.info(f"Initialized last_host to {current_host}.")
-
             logger.info(f"State loaded: {len(LINKS)} links")
     except Exception as e:
         logger.warning(f"Could not load state: {e}")
@@ -150,8 +125,6 @@ async def save_state():
                     "sub_path": CONFIG.get("sub_path", "/sub"),
                     "setup_path": CONFIG.get("setup_path", "/setup"),
                 },
-                "last_host": get_host(),  # store effective host
-                "custom_host": CONFIG.get("custom_host"),
             }
             tmp = DATA_FILE.with_suffix(".tmp")
             async with aiofiles.open(tmp, "w", encoding="utf-8") as f:
@@ -355,14 +328,11 @@ async def shutdown():
         await http_client.aclose()
 
 def get_host(request: Optional[Request] = None) -> str:
-    # If a custom host is set, use it
-    if CONFIG.get("custom_host"):
-        return CONFIG["custom_host"]
+    """همیشه دامنه‌ی واقعی را از هدر درخواست می‌خواند"""
     if request is not None:
         h = request.headers.get("x-forwarded-host") or request.headers.get("host")
         if h:
             h = h.split(":")[0]
-            CONFIG["host"] = h
             return h
     return os.environ.get("RAILWAY_PUBLIC_DOMAIN", CONFIG["host"])
 
@@ -1427,32 +1397,20 @@ async def apply_ips(request: Request, _=Depends(require_auth)):
         log_activity("ips", f"Applied {len(new_ips)} IPs to {len(applied)} config(s)", "ok")
     return {"ok": True, "applied": applied}
 
-# ===== DOMAIN MANAGEMENT =====
+# ===== DOMAIN CHECK (FIXED: reads from request, detects any railway domain) =====
 @app.get("/api/domain/check")
-async def check_domain(_=Depends(require_auth)):
-    host = get_host()
+async def check_domain(request: Request, _=Depends(require_auth)):
+    # دامنه‌ای که کاربر در مرورگر وارد کرده است
+    host = get_host(request)
+    
+    # بررسی می‌کنیم که آیا دامنه شامل railway.app یا up.railway.app هست یا نه
+    # این روش هر دامنه‌ای که حاوی این عبارات باشد را تشخیص می‌دهد
     is_railway = "railway.app" in host or "up.railway.app" in host
-    custom_host = CONFIG.get("custom_host")
+    
     return {
         "host": host,
         "is_railway": is_railway,
-        "custom_host": custom_host,
-        "has_custom": bool(custom_host),
     }
-
-@app.post("/api/domain/set")
-async def set_domain(request: Request, _=Depends(require_auth)):
-    body = await request.json()
-    new_host = body.get("host", "").strip()
-    if not new_host:
-        raise HTTPException(status_code=400, detail="Domain cannot be empty")
-    # Simple validation: only allow letters, numbers, dots, hyphens
-    if not re.match(r'^[a-zA-Z0-9\-\.]+$', new_host):
-        raise HTTPException(status_code=400, detail="Invalid domain format")
-    CONFIG["custom_host"] = new_host
-    await save_state()
-    log_activity("domain", f"Custom domain set to {new_host}", "ok")
-    return {"ok": True, "host": new_host}
 
 # ===== HEALTH CHECK =====
 _executor = ThreadPoolExecutor(max_workers=20)
