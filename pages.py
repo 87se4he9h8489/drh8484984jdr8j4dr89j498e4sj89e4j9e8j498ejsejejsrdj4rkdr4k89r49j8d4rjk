@@ -2334,8 +2334,13 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
             });
 
             await loadApplyTargetsForSuggest();
-            updateSuggestApplyButton();
-            document.getElementById('applyStatus').textContent = `${currentSuggestedIPs.length} IP(s) loaded`;
+
+            // 🔥 FIX: Use setTimeout to ensure DOM is fully updated before enabling button
+            setTimeout(() => {
+                updateSuggestApplyButton();
+                document.getElementById('applyStatus').textContent = `${currentSuggestedIPs.length} IP(s) loaded`;
+            }, 50);
+
         } catch (e) {
             console.error('Fetch suggestions error:', e);
             toast('Failed to load IP suggestions', 'error');
@@ -2351,7 +2356,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
             if (!links.length) {
                 container.innerHTML = '<p class="text-[11px] text-slate-500 font-english">No configs — a new one will be created automatically.</p>';
-                document.getElementById('applySuggestBtn').disabled = false;
+                // No need to disable button; updateSuggestApplyButton will handle it
                 return;
             }
 
@@ -2363,22 +2368,22 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                 </label>
             `).join('');
 
-            // Also update button when target checkboxes change (optional)
+            // Listeners for target checkboxes (optional)
             container.querySelectorAll('.suggest-target-checkbox').forEach(cb => {
                 cb.addEventListener('change', updateSuggestApplyButton);
             });
 
-            updateSuggestApplyButton();
         } catch (e) {
             console.error('Load targets error:', e);
         }
     }
 
-    // ===== FIXED: Enable button based on IP selection, not target selection =====
+    // ===== FIXED: Enable button based on IP selection =====
     function updateSuggestApplyButton() {
         const ipCheckboxes = document.querySelectorAll('.suggest-ip-checkbox:checked');
         const applyBtn = document.getElementById('applySuggestBtn');
         applyBtn.disabled = (ipCheckboxes.length === 0);
+        console.log('IP checkboxes checked:', ipCheckboxes.length, 'Button disabled:', applyBtn.disabled);
     }
 
     async function applySuggestedIPs() {
