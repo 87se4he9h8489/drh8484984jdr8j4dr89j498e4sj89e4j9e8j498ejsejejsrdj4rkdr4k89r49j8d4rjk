@@ -1746,14 +1746,13 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                 if (modalId === 'databaseModal') {
                     loadDatabaseInfo();
                 }
-                if (modalId === 'ipSuggestModal') {
-                    // Check domain first, then load suggestions if allowed
-                    checkDomain().then(() => {
-                        if (!domainStatus.is_railway || domainStatus.custom_host) {
-                            fetchSuggestions();
-                        }
-                    });
-                }
+                if (modalId === 'ipSuggestModal' && show) {
+    checkDomain().then(() => {
+        if (!domainStatus.is_railway) {
+            fetchSuggestions();
+        }
+    });
+}
                 if (modalId === 'healthModal') {
                     loadHealthConfigs();
                 }
@@ -2364,70 +2363,66 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         }
 
         // ===== DOMAIN MANAGEMENT =====
-        let domainStatus = { is_railway: false, host: '', custom_host: null };
+        let domainStatus = { is_railway: false, host: '' };
 
-        async function checkDomain() {
-            try {
-                const res = await fetch('/api/domain/check');
-                const data = await res.json();
-                domainStatus = data;
-                renderDomainStatus();
-                return data;
-            } catch (e) {
-                console.error('Domain check failed:', e);
-                toast('Failed to check domain', 'error');
-            }
-        }
 
-        function renderDomainStatus() {
-            const container = document.getElementById('domainStatus');
-            const { is_railway, host, custom_host } = domainStatus;
-            const hasCustom = !!custom_host;
+async function checkDomain() {
+    try {
+        const res = await fetch('/api/domain/check');
+        const data = await res.json();
+        domainStatus = data;
+        renderDomainStatus();
+        return data;
+    } catch (e) {
+        console.error('Domain check failed:', e);
+        toast('Failed to check domain', 'error');
+    }
+}
 
-            if (is_railway && !hasCustom) {
-                // Locked: Railway default domain, no custom domain set
-                container.innerHTML = `
-                    <div class="flex items-start gap-3 text-amber-400">
-                        <i data-lucide="alert-triangle" class="w-5 h-5 mt-0.5"></i>
-                        <div class="flex-1">
-                            <p class="text-sm font-bold font-english">⚠️ Railway Default Domain Detected</p>
-                            <p class="text-xs text-slate-400 mt-1 font-english">
-                                To use IP Suggestions, you need to set a custom domain (e.g., <span class="text-cyan-400 font-mono">railway1.cameliaam.ir</span>).
-                            </p>
-                            <div class="mt-3 flex items-center gap-2">
-                                <input type="text" id="customDomainInput" placeholder="Enter your custom domain" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-english">
-                                <button onclick="saveCustomDomain()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium rounded-lg transition-all duration-200 font-english">Save</button>
-                            </div>
-                            <p class="text-[10px] text-slate-500 mt-1 font-english">Current host: <span class="font-mono">${host}</span></p>
-                        </div>
-                    </div>
-                `;
-                // Hide IP sections
-                document.getElementById('suggestResult').style.display = 'none';
-                document.getElementById('applyTargetPicker').style.display = 'none';
-                document.getElementById('loadIpsBtn').disabled = true;
-                document.getElementById('loadIpsBtn').classList.add('opacity-50');
-                lucide.createIcons();
-                return;
-            }
+function renderDomainStatus() {
+    const container = document.getElementById('domainStatus');
+    const { is_railway, host } = domainStatus;
 
-            // Normal: domain is allowed
-            container.innerHTML = `
-                <div class="flex items-start gap-3 text-emerald-400">
-                    <i data-lucide="check-circle" class="w-5 h-5 mt-0.5"></i>
-                    <div class="flex-1">
-                        <p class="text-sm font-bold font-english">✅ Domain: ${hasCustom ? 'Custom' : 'Public'}</p>
-                        <p class="text-xs text-slate-400 font-english">${hasCustom ? `Custom domain: <span class="font-mono text-cyan-400">${custom_host}</span>` : `Current host: <span class="font-mono">${host}</span>`}</p>
-                        <button onclick="showDomainChanger()" class="mt-1 text-[10px] text-slate-500 hover:text-slate-300 transition-colors font-english">Change domain</button>
-                    </div>
+    if (is_railway) {
+        // قفل: دامنه Railway است
+        container.innerHTML = `
+            <div class="flex items-start gap-3 text-amber-400">
+                <i data-lucide="alert-triangle" class="w-5 h-5 mt-0.5"></i>
+                <div class="flex-1">
+                    <p class="text-sm font-bold font-english">⚠️ Railway Default Domain Detected</p>
+                    <p class="text-xs text-slate-400 mt-1 font-english">
+                        You cannot use IP Suggestions with a Railway default domain.
+                        Please use a custom domain (e.g., <span class="text-cyan-400 font-mono">railway1.cameliaam.ir</span>).
+                    </p>
+                    <p class="text-[10px] text-slate-500 mt-1 font-english">Current host: <span class="font-mono">${host}</span></p>
                 </div>
-            `;
-            document.getElementById('suggestResult').style.display = 'block';
-            document.getElementById('applyTargetPicker').style.display = 'block';
-            document.getElementById('loadIpsBtn').disabled = false;
-            document.getElementById('loadIpsBtn').classList.remove('opacity-50');
-            lucide.createIcons();
-        }
+            </div>
+        `;
+        // مخفی کردن بخش‌های IP
+        document.getElementById('suggestResult').style.display = 'none';
+        document.getElementById('applyTargetPicker').style.display = 'none';
+        document.getElementById('loadIpsBtn').disabled = true;
+        document.getElementById('loadIpsBtn').classList.add('opacity-50');
+        lucide.createIcons();
+        return;
+    }
+
+    // حالت عادی: دامنه مجاز است
+    container.innerHTML = `
+        <div class="flex items-start gap-3 text-emerald-400">
+            <i data-lucide="check-circle" class="w-5 h-5 mt-0.5"></i>
+            <div class="flex-1">
+                <p class="text-sm font-bold font-english">✅ Valid Domain</p>
+                <p class="text-xs text-slate-400 font-english">Current host: <span class="font-mono">${host}</span></p>
+            </div>
+        </div>
+    `;
+    document.getElementById('suggestResult').style.display = 'block';
+    document.getElementById('applyTargetPicker').style.display = 'block';
+    document.getElementById('loadIpsBtn').disabled = false;
+    document.getElementById('loadIpsBtn').classList.remove('opacity-50');
+    lucide.createIcons();
+}
 
         async function saveCustomDomain() {
             const input = document.getElementById('customDomainInput');
