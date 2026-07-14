@@ -71,6 +71,7 @@ CONFIG = {
     "port": int(os.environ.get("PORT", 8000)),
     "secret": _load_or_create_secret(),
     "host": os.environ.get("RAILWAY_PUBLIC_DOMAIN", "localhost"),
+    "custom_host": None,  # custom domain set by user
     "dashboard_path": "/dashboard",
     "login_path": "/login",
     "sub_path": "/sub",
@@ -107,11 +108,13 @@ async def load_state():
                 for key, value in data["paths"].items():
                     if key in CONFIG:
                         CONFIG[key] = value
+            # Load custom_host if present
+            if "custom_host" in data:
+                CONFIG["custom_host"] = data["custom_host"]
 
-            # ===== Host change detection: clear all ip_pool if host changed =====
+            # Host change detection: clear all ip_pool if the effective host changed
             last_host = data.get("last_host")
-            current_host = CONFIG["host"]
-            # Only act if we have a meaningful host (not localhost or 127.0.0.1)
+            current_host = get_host()  # using get_host which respects custom_host
             if last_host and last_host != current_host and current_host not in ("localhost", "127.0.0.1"):
                 logger.info(f"Host changed from {last_host} to {current_host}. Clearing all ip_pool entries.")
                 for uid in LINKS:
@@ -147,7 +150,8 @@ async def save_state():
                     "sub_path": CONFIG.get("sub_path", "/sub"),
                     "setup_path": CONFIG.get("setup_path", "/setup"),
                 },
-                "last_host": CONFIG["host"],
+                "last_host": get_host(),  # store effective host
+                "custom_host": CONFIG.get("custom_host"),
             }
             tmp = DATA_FILE.with_suffix(".tmp")
             async with aiofiles.open(tmp, "w", encoding="utf-8") as f:
@@ -246,7 +250,6 @@ def get_client_ip(request: Request) -> str:
         return real_ip.strip()
     return request.client.host if request.client else "127.0.0.1"
 
-# Not used for labels, but kept for compatibility
 async def get_client_country(request: Request) -> tuple[str, str]:
     cf_country = request.headers.get("CF-IPCountry")
     if cf_country:
@@ -352,6 +355,9 @@ async def shutdown():
         await http_client.aclose()
 
 def get_host(request: Optional[Request] = None) -> str:
+    # If a custom host is set, use it
+    if CONFIG.get("custom_host"):
+        return CONFIG["custom_host"]
     if request is not None:
         h = request.headers.get("x-forwarded-host") or request.headers.get("host")
         if h:
@@ -1420,6 +1426,33 @@ async def apply_ips(request: Request, _=Depends(require_auth)):
         await save_state()
         log_activity("ips", f"Applied {len(new_ips)} IPs to {len(applied)} config(s)", "ok")
     return {"ok": True, "applied": applied}
+
+# ===== DOMAIN MANAGEMENT =====
+@app.get("/api/domain/check")
+async def check_domain(_=Depends(require_auth)):
+    host = get_host()
+    is_railway = "railway.app" in host or "up.railway.app" in host
+    custom_host = CONFIG.get("custom_host")
+    return {
+        "host": host,
+        "is_railway": is_railway,
+        "custom_host": custom_host,
+        "has_custom": bool(custom_host),
+    }
+
+@app.post("/api/domain/set")
+async def set_domain(request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    new_host = body.get("host", "").strip()
+    if not new_host:
+        raise HTTPException(status_code=400, detail="Domain cannot be empty")
+    # Simple validation: only allow letters, numbers, dots, hyphens
+    if not re.match(r'^[a-zA-Z0-9\-\.]+$', new_host):
+        raise HTTPException(status_code=400, detail="Invalid domain format")
+    CONFIG["custom_host"] = new_host
+    await save_state()
+    log_activity("domain", f"Custom domain set to {new_host}", "ok")
+    return {"ok": True, "host": new_host}
 
 # ===== HEALTH CHECK =====
 _executor = ThreadPoolExecutor(max_workers=20)

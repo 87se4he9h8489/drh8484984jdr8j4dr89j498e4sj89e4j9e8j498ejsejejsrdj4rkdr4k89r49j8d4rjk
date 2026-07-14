@@ -1126,63 +1126,69 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
     </footer>
 
     <!-- ===== MODAL: IP SUGGESTIONS ===== -->
-    <div id="ipSuggestModal" class="custom-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75">
-        <div class="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl overflow-hidden modal-glow max-h-[95vh] flex flex-col transition-all duration-300 transform scale-95 opacity-0 active:scale-100 active:opacity-100">
-            <!-- Header -->
-            <div class="p-4 sm:p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/40 shrink-0">
-                <div class="flex items-center space-x-3 min-w-0">
-                    <div class="p-2 bg-cyan-500/10 rounded-lg text-cyan-400 border border-cyan-500/20 shrink-0">
-                        <i data-lucide="list" class="w-4 h-4 sm:w-5 sm:h-5"></i>
-                    </div>
-                    <div class="min-w-0">
-                        <h3 class="text-base sm:text-lg font-bold text-slate-100 truncate font-english">IP Suggestions</h3>
-                        <p class="text-[10px] sm:text-xs text-slate-400 truncate font-english">Pick 10 random IPs from a curated list – no pings, no bans</p>
-                    </div>
+    <!-- ===== MODAL: IP SUGGESTIONS ===== -->
+<div id="ipSuggestModal" class="custom-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl overflow-hidden modal-glow max-h-[95vh] flex flex-col transition-all duration-300 transform scale-95 opacity-0 active:scale-100 active:opacity-100">
+        <!-- Header -->
+        <div class="p-4 sm:p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/40 shrink-0">
+            <div class="flex items-center space-x-3 min-w-0">
+                <div class="p-2 bg-cyan-500/10 rounded-lg text-cyan-400 border border-cyan-500/20 shrink-0">
+                    <i data-lucide="list" class="w-4 h-4 sm:w-5 sm:h-5"></i>
                 </div>
-                <button onclick="toggleModal('ipSuggestModal', false)" class="p-1.5 sm:p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all duration-300">
-                    <i data-lucide="x" class="w-4 h-4 sm:w-5 sm:h-5"></i>
-                </button>
+                <div class="min-w-0">
+                    <h3 class="text-base sm:text-lg font-bold text-slate-100 truncate font-english">IP Suggestions</h3>
+                    <p class="text-[10px] sm:text-xs text-slate-400 truncate font-english">Pick 10 random IPs from a curated list – no pings, no bans</p>
+                </div>
+            </div>
+            <button onclick="toggleModal('ipSuggestModal', false)" class="p-1.5 sm:p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all duration-300">
+                <i data-lucide="x" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+            </button>
+        </div>
+
+        <!-- Content -->
+        <div class="p-4 sm:p-6 overflow-y-auto flex-1 scrollable-modal-content">
+            <!-- ===== DOMAIN STATUS ===== -->
+            <div id="domainStatus" class="mb-4 p-3 rounded-xl border transition-all duration-300">
+                <!-- dynamically filled -->
             </div>
 
-            <!-- Content -->
-            <div class="p-4 sm:p-6 overflow-y-auto flex-1 scrollable-modal-content">
-                <!-- Suggestion list -->
-                <div id="suggestResult" class="mb-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider font-english">Suggested IPs</span>
-                        <button onclick="fetchSuggestions()" class="text-xs text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1 font-english">
-                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
-                        </button>
-                    </div>
-                    <div id="suggestList" class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto p-2 bg-slate-950/50 rounded-xl border border-slate-800">
-                        <p class="col-span-full text-center text-slate-500 text-sm font-english">Click "Load IPs" to get a fresh batch.</p>
-                    </div>
+            <!-- Suggestion list (hidden if domain is Railway) -->
+            <div id="suggestResult" class="mb-4">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider font-english">Suggested IPs</span>
+                    <button onclick="fetchSuggestions()" id="refreshSuggestBtn" class="text-xs text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1 font-english">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+                    </button>
                 </div>
-
-                <!-- Apply targets -->
-                <div id="applyTargetPicker" class="p-3 rounded-xl bg-slate-800/30 border border-slate-700/50">
-                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 font-english">Apply To</p>
-                    <div id="applyTargetList" class="space-y-1.5 max-h-32 overflow-y-auto"></div>
-                    <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
-                        <span id="applyStatus" class="text-[10px] text-slate-500 font-english">Load suggestions first</span>
-                        <button onclick="applySuggestedIPs()" id="applySuggestBtn" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-xl transition-all duration-300 shadow-lg shadow-emerald-600/10 hover:shadow-emerald-600/25 flex items-center gap-2 font-english disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                            <i data-lucide="check" class="w-3.5 h-3.5"></i> Apply to Selected
-                        </button>
-                    </div>
+                <div id="suggestList" class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto p-2 bg-slate-950/50 rounded-xl border border-slate-800">
+                    <p class="col-span-full text-center text-slate-500 text-sm font-english">Click "Load IPs" to get a fresh batch.</p>
                 </div>
             </div>
 
-            <!-- Footer -->
-            <div class="p-3 sm:p-4 border-t border-slate-800 bg-slate-950/40 flex items-center justify-between shrink-0">
-                <button onclick="fetchSuggestions()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs sm:text-sm font-medium rounded-xl transition-all duration-300 shadow-lg shadow-cyan-600/10 flex items-center gap-2 font-english">
-                    <i data-lucide="refresh-cw" class="w-4 h-4"></i> Load IPs
-                </button>
-                <button onclick="toggleModal('ipSuggestModal', false)" class="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-medium rounded-xl transition-all duration-300 font-english">
-                    Close
-                </button>
+            <!-- Apply targets (hidden if domain is Railway) -->
+            <div id="applyTargetPicker" class="p-3 rounded-xl bg-slate-800/30 border border-slate-700/50">
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 font-english">Apply To</p>
+                <div id="applyTargetList" class="space-y-1.5 max-h-32 overflow-y-auto"></div>
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    <span id="applyStatus" class="text-[10px] text-slate-500 font-english">Load suggestions first</span>
+                    <button onclick="applySuggestedIPs()" id="applySuggestBtn" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-xl transition-all duration-300 shadow-lg shadow-emerald-600/10 hover:shadow-emerald-600/25 flex items-center gap-2 font-english disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <i data-lucide="check" class="w-3.5 h-3.5"></i> Apply to Selected
+                    </button>
+                </div>
             </div>
         </div>
+
+        <!-- Footer -->
+        <div class="p-3 sm:p-4 border-t border-slate-800 bg-slate-950/40 flex items-center justify-between shrink-0">
+            <button onclick="fetchSuggestions()" id="loadIpsBtn" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs sm:text-sm font-medium rounded-xl transition-all duration-300 shadow-lg shadow-cyan-600/10 flex items-center gap-2 font-english">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i> Load IPs
+            </button>
+            <button onclick="toggleModal('ipSuggestModal', false)" class="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-medium rounded-xl transition-all duration-300 font-english">
+                Close
+            </button>
+        </div>
     </div>
+</div>
 
     <!-- ===== MODAL: CONFIG HEALTH CHECK ===== -->
     <div id="healthModal" class="custom-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75">
@@ -1708,8 +1714,125 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
     <!-- ===== FULL JAVASCRIPT ===== -->
     <script>
+    
         lucide.createIcons();
+let domainStatus = { is_railway: false, host: '', custom_host: null };
 
+async function checkDomain() {
+    try {
+        const res = await fetch('/api/domain/check');
+        const data = await res.json();
+        domainStatus = data;
+        renderDomainStatus();
+        return data;
+    } catch (e) {
+        console.error('Domain check failed:', e);
+        toast('Failed to check domain', 'error');
+    }
+}
+
+function renderDomainStatus() {
+    const container = document.getElementById('domainStatus');
+    const { is_railway, host, custom_host } = domainStatus;
+    const hasCustom = !!custom_host;
+
+    if (is_railway && !hasCustom) {
+        // قفل: دامنه Railway است و دامنه‌ی سفارشی تنظیم نشده
+        container.innerHTML = `
+            <div class="flex items-start gap-3 text-amber-400">
+                <i data-lucide="alert-triangle" class="w-5 h-5 mt-0.5"></i>
+                <div class="flex-1">
+                    <p class="text-sm font-bold font-english">⚠️ Railway Default Domain Detected</p>
+                    <p class="text-xs text-slate-400 mt-1 font-english">
+                        To use IP Suggestions, you need to set a custom domain (e.g., <span class="text-cyan-400 font-mono">railway1.cameliaam.ir</span>).
+                    </p>
+                    <div class="mt-3 flex items-center gap-2">
+                        <input type="text" id="customDomainInput" placeholder="Enter your custom domain" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-english">
+                        <button onclick="saveCustomDomain()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium rounded-lg transition-all duration-200 font-english">Save</button>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1 font-english">Current host: <span class="font-mono">${host}</span></p>
+                </div>
+            </div>
+        `;
+        // مخفی کردن بخش‌های IP
+        document.getElementById('suggestResult').style.display = 'none';
+        document.getElementById('applyTargetPicker').style.display = 'none';
+        document.getElementById('loadIpsBtn').disabled = true;
+        document.getElementById('loadIpsBtn').classList.add('opacity-50');
+        lucide.createIcons();
+        return;
+    }
+
+    // حالت عادی: دامنه مجاز است
+    container.innerHTML = `
+        <div class="flex items-start gap-3 text-emerald-400">
+            <i data-lucide="check-circle" class="w-5 h-5 mt-0.5"></i>
+            <div class="flex-1">
+                <p class="text-sm font-bold font-english">✅ Domain: ${hasCustom ? 'Custom' : 'Public'}</p>
+                <p class="text-xs text-slate-400 font-english">${hasCustom ? `Custom domain: <span class="font-mono text-cyan-400">${custom_host}</span>` : `Current host: <span class="font-mono">${host}</span>`}</p>
+                <button onclick="showDomainChanger()" class="mt-1 text-[10px] text-slate-500 hover:text-slate-300 transition-colors font-english">Change domain</button>
+            </div>
+        </div>
+    `;
+    document.getElementById('suggestResult').style.display = 'block';
+    document.getElementById('applyTargetPicker').style.display = 'block';
+    document.getElementById('loadIpsBtn').disabled = false;
+    document.getElementById('loadIpsBtn').classList.remove('opacity-50');
+    lucide.createIcons();
+}
+
+async function saveCustomDomain() {
+    const input = document.getElementById('customDomainInput');
+    const domain = input.value.trim();
+    if (!domain) {
+        toast('Please enter a domain', 'error');
+        return;
+    }
+    try {
+        const res = await fetch('/api/domain/set', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ host: domain })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Failed to save domain');
+        }
+        toast('Domain saved successfully!', 'success');
+        await checkDomain(); // به‌روزرسانی وضعیت
+        fetchSuggestions(); // بارگذاری IP‌ها
+    } catch (e) {
+        toast('Error: ' + e.message, 'error');
+    }
+}
+
+function showDomainChanger() {
+    const container = document.getElementById('domainStatus');
+    const current = domainStatus.custom_host || domainStatus.host;
+    container.innerHTML = `
+        <div class="flex items-start gap-3 text-blue-400">
+            <i data-lucide="edit" class="w-5 h-5 mt-0.5"></i>
+            <div class="flex-1">
+                <p class="text-sm font-bold font-english">Change Domain</p>
+                <div class="mt-2 flex items-center gap-2">
+                    <input type="text" id="customDomainInput" placeholder="Enter new domain" value="${current}" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-english">
+                    <button onclick="saveCustomDomain()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium rounded-lg transition-all duration-200 font-english">Save</button>
+                    <button onclick="checkDomain()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium rounded-lg transition-all duration-200 font-english">Cancel</button>
+                </div>
+            </div>
+        </div>
+    `;
+    lucide.createIcons();
+}
+
+
+if (modalId === 'ipSuggestModal' && show) {
+    checkDomain().then(() => {
+        if (!domainStatus.is_railway || domainStatus.custom_host) {
+            fetchSuggestions();
+        }
+    });
+}
         // ---- Custom confirm ----
         let _confirmResolve = null;
 
