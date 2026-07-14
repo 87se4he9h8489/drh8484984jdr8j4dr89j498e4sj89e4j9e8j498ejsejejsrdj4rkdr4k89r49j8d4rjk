@@ -1657,1064 +1657,1064 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
             <button onclick="toggleModal('customAlert', false)" class="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[10px] sm:text-xs font-semibold rounded-xl transition-all duration-300 font-english">Acknowledge</button>
         </div>
     </div>
+<script>
+    lucide.createIcons();
 
-    <script>
+    // ---- Custom confirm ----
+    let _confirmResolve = null;
+
+    function customConfirm(message) {
+        document.getElementById('confirmMessage').textContent = message;
+        toggleModal('confirmModal', true);
+        return new Promise((resolve) => { _confirmResolve = resolve; });
+    }
+
+    function _confirmYes() {
+        toggleModal('confirmModal', false);
+        if (_confirmResolve) _confirmResolve(true);
+        _confirmResolve = null;
+    }
+
+    function _confirmNo() {
+        toggleModal('confirmModal', false);
+        if (_confirmResolve) _confirmResolve(false);
+        _confirmResolve = null;
+    }
+
+    // Modal toggles
+    function toggleModal(modalId, show) {
+        const target = document.getElementById(modalId);
+        const modalContent = target.querySelector('.bg-slate-900, .bg-slate-900.border');
+        if (show) {
+            target.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            if (modalContent) {
+                modalContent.style.transform = 'scale(1)';
+                modalContent.style.opacity = '1';
+            }
+            if (modalId === 'databaseModal') {
+                loadDatabaseInfo();
+            }
+            if (modalId === 'ipSuggestModal') {
+                fetchSuggestions();
+            }
+        } else {
+            target.classList.remove('active');
+            document.body.style.overflow = '';
+            if (modalContent) {
+                modalContent.style.transform = 'scale(0.95)';
+                modalContent.style.opacity = '0';
+            }
+        }
+        if (modalId === 'settingsModal' && show) {
+            loadSettingsPaths();
+            document.getElementById('settings-current-pw').value = '';
+            document.getElementById('settings-new-pw').value = '';
+            document.getElementById('settings-confirm-pw').value = '';
+            document.getElementById('settingsError').classList.add('hidden');
+            document.getElementById('pathSettingsError').classList.add('hidden');
+        }
+    }
+
+    // Toast
+    function toast(msg, type = '') {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className = 'toast show' + (type ? ' ' + type : '');
+        clearTimeout(el._timeout);
+        el._timeout = setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    // Copy
+    function copyLink(inputId) {
+        const inp = document.getElementById(inputId);
+        inp.select();
+        navigator.clipboard.writeText(inp.value);
+        triggerAlert('Token Copied', 'Configuration token copied to clipboard.', 'check-circle');
+    }
+
+    // Alert
+    function triggerAlert(title, message, iconName) {
+        document.getElementById('alertTitle').textContent = title;
+        document.getElementById('alertMessage').textContent = message;
+        const icon = document.getElementById('alertIcon');
+        icon.setAttribute('data-lucide', iconName);
         lucide.createIcons();
+        toggleModal('customAlert', true);
+    }
 
-        // ---- Custom confirm ----
-        let _confirmResolve = null;
+    // ===== DATABASE FUNCTIONS =====
+    let selectedFile = null;
 
-        function customConfirm(message) {
-            document.getElementById('confirmMessage').textContent = message;
-            toggleModal('confirmModal', true);
-            return new Promise((resolve) => { _confirmResolve = resolve; });
-        }
+    function loadDatabaseInfo() {
+        fetch('/api/links')
+            .then(res => res.json())
+            .then(data => {
+                const links = data.links || [];
+                let totalTraffic = 0;
+                let activeCount = 0;
 
-        function _confirmYes() {
-            toggleModal('confirmModal', false);
-            if (_confirmResolve) _confirmResolve(true);
-            _confirmResolve = null;
-        }
-
-        function _confirmNo() {
-            toggleModal('confirmModal', false);
-            if (_confirmResolve) _confirmResolve(false);
-            _confirmResolve = null;
-        }
-
-        // Modal toggles
-        function toggleModal(modalId, show) {
-            const target = document.getElementById(modalId);
-            const modalContent = target.querySelector('.bg-slate-900, .bg-slate-900.border');
-            if (show) {
-                target.classList.add('active');
-                document.body.style.overflow = 'hidden';
-                if (modalContent) {
-                    modalContent.style.transform = 'scale(1)';
-                    modalContent.style.opacity = '1';
-                }
-                if (modalId === 'databaseModal') {
-                    loadDatabaseInfo();
-                }
-                if (modalId === 'ipSuggestModal') {
-                    fetchSuggestions();
-                }
-            } else {
-                target.classList.remove('active');
-                document.body.style.overflow = '';
-                if (modalContent) {
-                    modalContent.style.transform = 'scale(0.95)';
-                    modalContent.style.opacity = '0';
-                }
-            }
-            if (modalId === 'settingsModal' && show) {
-                loadSettingsPaths();
-                document.getElementById('settings-current-pw').value = '';
-                document.getElementById('settings-new-pw').value = '';
-                document.getElementById('settings-confirm-pw').value = '';
-                document.getElementById('settingsError').classList.add('hidden');
-                document.getElementById('pathSettingsError').classList.add('hidden');
-            }
-        }
-
-        // Toast
-        function toast(msg, type = '') {
-            const el = document.getElementById('toast');
-            el.textContent = msg;
-            el.className = 'toast show' + (type ? ' ' + type : '');
-            clearTimeout(el._timeout);
-            el._timeout = setTimeout(() => el.classList.remove('show'), 2500);
-        }
-
-        // Copy
-        function copyLink(inputId) {
-            const inp = document.getElementById(inputId);
-            inp.select();
-            navigator.clipboard.writeText(inp.value);
-            triggerAlert('Token Copied', 'Configuration token copied to clipboard.', 'check-circle');
-        }
-
-        // Alert
-        function triggerAlert(title, message, iconName) {
-            document.getElementById('alertTitle').textContent = title;
-            document.getElementById('alertMessage').textContent = message;
-            const icon = document.getElementById('alertIcon');
-            icon.setAttribute('data-lucide', iconName);
-            lucide.createIcons();
-            toggleModal('customAlert', true);
-        }
-
-        // ===== DATABASE FUNCTIONS =====
-        let selectedFile = null;
-
-        function loadDatabaseInfo() {
-            fetch('/api/links')
-                .then(res => res.json())
-                .then(data => {
-                    const links = data.links || [];
-                    let totalTraffic = 0;
-                    let activeCount = 0;
-
-                    links.forEach(l => {
-                        totalTraffic += l.used_bytes || 0;
-                        if (l.active) activeCount++;
-                    });
-
-                    document.getElementById('db-total-configs').textContent = links.length;
-                    document.getElementById('db-active-configs').textContent = activeCount;
-                    document.getElementById('db-total-traffic').textContent = fmtBytes(totalTraffic);
-                    document.getElementById('db-last-saved').textContent = new Date().toLocaleString();
-
-                    const tbody = document.getElementById('dbConfigsBody');
-                    if (links.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-slate-500 font-english">No configurations found</td></tr>';
-                    } else {
-                        tbody.innerHTML = links.map(l => `
-                            <tr class="border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors">
-                                <td class="py-2 px-2 text-slate-200 font-medium truncate max-w-[80px] font-english">${l.label || 'Unnamed'}</td>
-                                <td class="py-2 px-2 text-slate-400 font-mono text-[10px] truncate max-w-[100px] font-english">${l.uuid.substring(0, 12)}...</td>
-                                <td class="py-2 px-2 text-right text-blue-300 font-mono font-english">${fmtBytes(l.used_bytes || 0)}</td>
-                                <td class="py-2 px-2 text-right text-amber-300 font-mono font-english">${l.limit_bytes === 0 ? '∞' : fmtBytes(l.limit_bytes)}</td>
-                                <td class="py-2 px-2 text-center">
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] ${l.active ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'} font-english">
-                                        <span class="w-1.5 h-1.5 rounded-full ${l.active ? 'bg-emerald-400' : 'bg-red-400'}"></span>
-                                        ${l.active ? 'Active' : 'Inactive'}
-                                    </span>
-                                </td>
-                                <td class="py-2 px-2 text-right text-slate-400 font-mono font-english">${l.connected_ips || 0}</td>
-                            </tr>
-                        `).join('');
-                    }
-                })
-                .catch(err => {
-                    console.error('Error loading database info:', err);
-                    toast('Failed to load database info', 'error');
+                links.forEach(l => {
+                    totalTraffic += l.used_bytes || 0;
+                    if (l.active) activeCount++;
                 });
+
+                document.getElementById('db-total-configs').textContent = links.length;
+                document.getElementById('db-active-configs').textContent = activeCount;
+                document.getElementById('db-total-traffic').textContent = fmtBytes(totalTraffic);
+                document.getElementById('db-last-saved').textContent = new Date().toLocaleString();
+
+                const tbody = document.getElementById('dbConfigsBody');
+                if (links.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-slate-500 font-english">No configurations found</td></tr>';
+                } else {
+                    tbody.innerHTML = links.map(l => `
+                        <tr class="border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors">
+                            <td class="py-2 px-2 text-slate-200 font-medium truncate max-w-[80px] font-english">${l.label || 'Unnamed'}</td>
+                            <td class="py-2 px-2 text-slate-400 font-mono text-[10px] truncate max-w-[100px] font-english">${l.uuid.substring(0, 12)}...</td>
+                            <td class="py-2 px-2 text-right text-blue-300 font-mono font-english">${fmtBytes(l.used_bytes || 0)}</td>
+                            <td class="py-2 px-2 text-right text-amber-300 font-mono font-english">${l.limit_bytes === 0 ? '∞' : fmtBytes(l.limit_bytes)}</td>
+                            <td class="py-2 px-2 text-center">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] ${l.active ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'} font-english">
+                                    <span class="w-1.5 h-1.5 rounded-full ${l.active ? 'bg-emerald-400' : 'bg-red-400'}"></span>
+                                    ${l.active ? 'Active' : 'Inactive'}
+                                </span>
+                            </td>
+                            <td class="py-2 px-2 text-right text-slate-400 font-mono font-english">${l.connected_ips || 0}</td>
+                        </tr>
+                    `).join('');
+                }
+            })
+            .catch(err => {
+                console.error('Error loading database info:', err);
+                toast('Failed to load database info', 'error');
+            });
+    }
+
+    function fmtBytes(b) {
+        if (b === 0) return '0 B';
+        if (b < 1024) return b + ' B';
+        if (b < 1024 ** 2) return (b / 1024).toFixed(1) + ' KB';
+        if (b < 1024 ** 3) return (b / 1024 ** 2).toFixed(2) + ' MB';
+        return (b / 1024 ** 3).toFixed(2) + ' GB';
+    }
+
+    // Download Database
+    function downloadDatabase() {
+        fetch('/api/database/export')
+            .then(res => {
+                if (!res.ok) throw new Error('Failed to export database');
+                return res.json();
+            })
+            .then(data => {
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'mx-ui.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                toast('Database downloaded successfully!', 'success');
+            })
+            .catch(err => {
+                console.error('Download error:', err);
+                toast('Failed to download database: ' + err.message, 'error');
+            });
+    }
+
+    // File drop zone handlers
+    const dropZone = document.getElementById('dropZone');
+    if (dropZone) {
+        dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+        });
+        dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+    }
+
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+            handleFile(file);
+        }
+    }
+
+    function handleFile(file) {
+        if (file.name !== 'mx-ui.json') {
+            toast('Please select a valid mx-ui.json file', 'error');
+            return;
+        }
+        selectedFile = file;
+        document.getElementById('fileName').textContent = file.name + ' (' + (file.size / 1024).toFixed(2) + ' KB)';
+        document.getElementById('dropZone').classList.add('has-file');
+        document.getElementById('restoreBtn').disabled = false;
+        toast('File loaded: ' + file.name, 'info');
+    }
+
+    // Restore Database
+    function restoreDatabase() {
+        if (!selectedFile) {
+            toast('Please select a file first', 'error');
+            return;
         }
 
-        function fmtBytes(b) {
-            if (b === 0) return '0 B';
-            if (b < 1024) return b + ' B';
-            if (b < 1024 ** 2) return (b / 1024).toFixed(1) + ' KB';
-            if (b < 1024 ** 3) return (b / 1024 ** 2).toFixed(2) + ' MB';
-            return (b / 1024 ** 3).toFixed(2) + ' GB';
-        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
 
-        // Download Database
-        function downloadDatabase() {
-            fetch('/api/database/export')
+                if (!data.links) {
+                    toast('Invalid database file format', 'error');
+                    return;
+                }
+
+                fetch('/api/database/restore', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                })
                 .then(res => {
-                    if (!res.ok) throw new Error('Failed to export database');
+                    if (!res.ok) throw new Error('Restore failed');
                     return res.json();
                 })
-                .then(data => {
-                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'mx-ui.json';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    toast('Database downloaded successfully!', 'success');
+                .then(result => {
+                    if (result.password_reset) {
+                        toast('✅ Database restored! Password reset to: MUVIXO', 'success');
+                    } else {
+                        toast('✅ Database restored successfully!', 'success');
+                    }
+
+                    document.getElementById('restoreBtn').disabled = true;
+                    document.getElementById('dropZone').classList.remove('has-file');
+                    document.getElementById('fileName').textContent = 'No file selected';
+                    selectedFile = null;
+                    loadDatabaseInfo();
+                    loadConfigs();
+                    setTimeout(updateStats, 500);
+
+                    if (result.requires_login) {
+                        setTimeout(async () => {
+                            try {
+                                await fetch('/api/logout', { method: 'POST' });
+                                const paths = await getCurrentPaths();
+                                location.href = paths.login;
+                            } catch (e) {
+                                location.href = '/login';
+                            }
+                        }, 3000);
+                    }
                 })
                 .catch(err => {
-                    console.error('Download error:', err);
-                    toast('Failed to download database: ' + err.message, 'error');
+                    toast('❌ Restore failed: ' + err.message, 'error');
                 });
-        }
+            } catch (err) {
+                toast('❌ Invalid JSON file: ' + err.message, 'error');
+            }
+        };
+        reader.readAsText(selectedFile);
+    }
 
-        // File drop zone handlers
-        const dropZone = document.getElementById('dropZone');
-        if (dropZone) {
-            dropZone.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                this.classList.add('dragover');
-            });
-            dropZone.addEventListener('dragleave', function(e) {
-                e.preventDefault();
-                this.classList.remove('dragover');
-            });
-            dropZone.addEventListener('drop', function(e) {
-                e.preventDefault();
-                this.classList.remove('dragover');
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    handleFile(files[0]);
+    // QR Modal
+    function openQrModal(label, uriPayload, subUrl) {
+        document.getElementById('qrTargetLabel').textContent = label;
+        document.getElementById('qrTextPayload').textContent = uriPayload;
+        document.getElementById('qrSubPayload').textContent = subUrl;
+
+        const qrImg = document.getElementById('qrImage');
+        const qrSubImg = document.getElementById('qrSubImage');
+
+        fetch(`/api/qr?data=${encodeURIComponent(uriPayload)}&size=300`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.qr) {
+                    qrImg.src = data.qr;
                 }
+            })
+            .catch(() => {
+                qrImg.src = `/api/qr?data=${encodeURIComponent(uriPayload)}&size=300&format=image`;
             });
-        }
 
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (file) {
-                handleFile(file);
-            }
-        }
-
-        function handleFile(file) {
-            if (file.name !== 'mx-ui.json') {
-                toast('Please select a valid mx-ui.json file', 'error');
-                return;
-            }
-            selectedFile = file;
-            document.getElementById('fileName').textContent = file.name + ' (' + (file.size / 1024).toFixed(2) + ' KB)';
-            document.getElementById('dropZone').classList.add('has-file');
-            document.getElementById('restoreBtn').disabled = false;
-            toast('File loaded: ' + file.name, 'info');
-        }
-
-        // Restore Database
-        function restoreDatabase() {
-            if (!selectedFile) {
-                toast('Please select a file first', 'error');
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = JSON.parse(e.target.result);
-
-                    if (!data.links) {
-                        toast('Invalid database file format', 'error');
-                        return;
-                    }
-
-                    fetch('/api/database/restore', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data)
-                    })
-                    .then(res => {
-                        if (!res.ok) throw new Error('Restore failed');
-                        return res.json();
-                    })
-                    .then(result => {
-                        if (result.password_reset) {
-                            toast('✅ Database restored! Password reset to: MUVIXO', 'success');
-                        } else {
-                            toast('✅ Database restored successfully!', 'success');
-                        }
-
-                        document.getElementById('restoreBtn').disabled = true;
-                        document.getElementById('dropZone').classList.remove('has-file');
-                        document.getElementById('fileName').textContent = 'No file selected';
-                        selectedFile = null;
-                        loadDatabaseInfo();
-                        loadConfigs();
-                        setTimeout(updateStats, 500);
-
-                        if (result.requires_login) {
-                            setTimeout(async () => {
-                                try {
-                                    await fetch('/api/logout', { method: 'POST' });
-                                    const paths = await getCurrentPaths();
-                                    location.href = paths.login;
-                                } catch (e) {
-                                    location.href = '/login';
-                                }
-                            }, 3000);
-                        }
-                    })
-                    .catch(err => {
-                        toast('❌ Restore failed: ' + err.message, 'error');
-                    });
-                } catch (err) {
-                    toast('❌ Invalid JSON file: ' + err.message, 'error');
+        fetch(`/api/qr?data=${encodeURIComponent(subUrl)}&size=300`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.qr) {
+                    qrSubImg.src = data.qr;
                 }
-            };
-            reader.readAsText(selectedFile);
-        }
+            })
+            .catch(() => {
+                qrSubImg.src = `/api/qr?data=${encodeURIComponent(subUrl)}&size=300&format=image`;
+            });
 
-        // QR Modal
-        function openQrModal(label, uriPayload, subUrl) {
-            document.getElementById('qrTargetLabel').textContent = label;
-            document.getElementById('qrTextPayload').textContent = uriPayload;
-            document.getElementById('qrSubPayload').textContent = subUrl;
+        toggleModal('qrModal', true);
+    }
 
-            const qrImg = document.getElementById('qrImage');
-            const qrSubImg = document.getElementById('qrSubImage');
-
-            fetch(`/api/qr?data=${encodeURIComponent(uriPayload)}&size=300`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.qr) {
-                        qrImg.src = data.qr;
-                    }
-                })
-                .catch(() => {
-                    qrImg.src = `/api/qr?data=${encodeURIComponent(uriPayload)}&size=300&format=image`;
-                });
-
-            fetch(`/api/qr?data=${encodeURIComponent(subUrl)}&size=300`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.qr) {
-                        qrSubImg.src = data.qr;
-                    }
-                })
-                .catch(() => {
-                    qrSubImg.src = `/api/qr?data=${encodeURIComponent(subUrl)}&size=300&format=image`;
-                });
-
-            toggleModal('qrModal', true);
-        }
-
-        // Copy text function
-        function copyText(text) {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(() => {
-                    toast('Copied to clipboard!', 'success');
-                }).catch(() => {
-                    fallbackCopyText(text);
-                });
-            } else {
-                fallbackCopyText(text);
-            }
-        }
-
-        function fallbackCopyText(text) {
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            textarea.style.position = 'fixed';
-            textarea.style.opacity = '0';
-            textarea.style.left = '-9999px';
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                document.execCommand('copy');
+    // Copy text function
+    function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
                 toast('Copied to clipboard!', 'success');
-            } catch (e) {
-                toast('Failed to copy', 'error');
-            }
-            document.body.removeChild(textarea);
+            }).catch(() => {
+                fallbackCopyText(text);
+            });
+        } else {
+            fallbackCopyText(text);
         }
+    }
 
-        // Edit modal
-        function openEditModal(label, protocol, fingerprint, alpn, limit, expiry, iplimit, speed, unit, uuid) {
-            document.getElementById('editNodeTitle').textContent = label;
-            document.getElementById('edit-uuid').value = uuid;
-            document.getElementById('edit-label').value = label;
-            document.getElementById('edit-protocol').value = protocol;
-            document.getElementById('edit-fp').value = fingerprint;
-            document.getElementById('edit-alpn').value = alpn || '';
-            document.getElementById('edit-limit').value = limit;
-            document.getElementById('edit-expiry').value = expiry;
-            document.getElementById('edit-iplimit').value = iplimit;
-            document.getElementById('edit-speed').value = speed;
-            document.getElementById('edit-speed-unit').value = unit || 'MBIT';
-            toggleModal('editModal', true);
+    function fallbackCopyText(text) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            toast('Copied to clipboard!', 'success');
+        } catch (e) {
+            toast('Failed to copy', 'error');
         }
+        document.body.removeChild(textarea);
+    }
 
-        // Get current paths
-        async function getCurrentPaths() {
-            try {
-                const res = await fetch('/api/current-paths');
-                if (!res.ok) throw new Error('Failed to fetch paths');
-                const data = await res.json();
-                return data;
-            } catch (e) {
-                console.error('Error fetching paths:', e);
-                return { dashboard: '/dashboard', login: '/login', sub: '/sub' };
-            }
+    // Edit modal
+    function openEditModal(label, protocol, fingerprint, alpn, limit, expiry, iplimit, speed, unit, uuid) {
+        document.getElementById('editNodeTitle').textContent = label;
+        document.getElementById('edit-uuid').value = uuid;
+        document.getElementById('edit-label').value = label;
+        document.getElementById('edit-protocol').value = protocol;
+        document.getElementById('edit-fp').value = fingerprint;
+        document.getElementById('edit-alpn').value = alpn || '';
+        document.getElementById('edit-limit').value = limit;
+        document.getElementById('edit-expiry').value = expiry;
+        document.getElementById('edit-iplimit').value = iplimit;
+        document.getElementById('edit-speed').value = speed;
+        document.getElementById('edit-speed-unit').value = unit || 'MBIT';
+        toggleModal('editModal', true);
+    }
+
+    // Get current paths
+    async function getCurrentPaths() {
+        try {
+            const res = await fetch('/api/current-paths');
+            if (!res.ok) throw new Error('Failed to fetch paths');
+            const data = await res.json();
+            return data;
+        } catch (e) {
+            console.error('Error fetching paths:', e);
+            return { dashboard: '/dashboard', login: '/login', sub: '/sub' };
         }
+    }
 
-        // Logout
-        async function logout() {
-            try {
-                const paths = await getCurrentPaths();
-                await fetch('/api/logout', { method: 'POST' });
-                location.href = paths.login;
-            } catch (e) {
-                await fetch('/api/logout', { method: 'POST' });
-                location.href = '/login';
-            }
+    // Logout
+    async function logout() {
+        try {
+            const paths = await getCurrentPaths();
+            await fetch('/api/logout', { method: 'POST' });
+            location.href = paths.login;
+        } catch (e) {
+            await fetch('/api/logout', { method: 'POST' });
+            location.href = '/login';
         }
+    }
 
-        // ---- Toggle System Details ----
-        let systemDetailsVisible = false;
+    // ---- Toggle System Details ----
+    let systemDetailsVisible = false;
 
-        function toggleSystemDetails() {
-            systemDetailsVisible = !systemDetailsVisible;
-            const wrapper = document.getElementById('systemDetailsWrapper');
-            const icon = document.getElementById('toggleSystemIcon');
-            const text = document.getElementById('toggleSystemText');
+    function toggleSystemDetails() {
+        systemDetailsVisible = !systemDetailsVisible;
+        const wrapper = document.getElementById('systemDetailsWrapper');
+        const icon = document.getElementById('toggleSystemIcon');
+        const text = document.getElementById('toggleSystemText');
 
-            if (systemDetailsVisible) {
-                wrapper.classList.add('open');
-                icon.classList.add('rotated');
-                text.textContent = 'Show Less';
-                setTimeout(() => {
-                    updateSystemDetails();
-                }, 100);
-            } else {
-                wrapper.classList.remove('open');
-                icon.classList.remove('rotated');
-                text.textContent = 'Show More';
-            }
+        if (systemDetailsVisible) {
+            wrapper.classList.add('open');
+            icon.classList.add('rotated');
+            text.textContent = 'Show Less';
             setTimeout(() => {
-                lucide.createIcons();
-            }, 50);
+                updateSystemDetails();
+            }, 100);
+        } else {
+            wrapper.classList.remove('open');
+            icon.classList.remove('rotated');
+            text.textContent = 'Show More';
+        }
+        setTimeout(() => {
+            lucide.createIcons();
+        }, 50);
+    }
+
+    // ---- Update System Details ----
+    async function updateSystemDetails() {
+        try {
+            const res = await fetch('/stats');
+            const d = await res.json();
+
+            document.getElementById('cpu-load-avg').textContent = d.cpu_percent ? d.cpu_percent.toFixed(1) + '%' : '--';
+            document.getElementById('cpu-cores-detail').textContent = d.cpu_cores ? d.cpu_cores + ' Cores' : '--';
+            const cpuPct = d.cpu_percent || 0;
+            document.getElementById('cpu-user').textContent = (cpuPct * 0.7).toFixed(1) + '%';
+            document.getElementById('cpu-system').textContent = (cpuPct * 0.3).toFixed(1) + '%';
+            document.getElementById('cpu-idle').textContent = (100 - cpuPct).toFixed(1) + '%';
+
+            const ramTotal = d.ram_total_mb || 0;
+            const ramUsed = d.ram_used_mb || 0;
+            document.getElementById('ram-total-detail').textContent = (ramTotal / 1024).toFixed(2) + ' GB';
+            document.getElementById('ram-used-detail').textContent = (ramUsed / 1024).toFixed(2) + ' GB';
+            document.getElementById('ram-free-detail').textContent = ((ramTotal - ramUsed) / 1024).toFixed(2) + ' GB';
+            document.getElementById('ram-available-detail').textContent = ((ramTotal - ramUsed) / 1024).toFixed(2) + ' GB';
+            document.getElementById('ram-cached-detail').textContent = ((ramTotal - ramUsed) * 0.3 / 1024).toFixed(2) + ' GB';
+
+            const swapTotal = d.swap_total_mb || 0;
+            const swapUsed = d.swap_used_mb || 0;
+            document.getElementById('swap-total-detail').textContent = (swapTotal / 1024).toFixed(2) + ' GB';
+            document.getElementById('swap-used-detail').textContent = (swapUsed / 1024).toFixed(2) + ' GB';
+            document.getElementById('swap-free-detail').textContent = ((swapTotal - swapUsed) / 1024).toFixed(2) + ' GB';
+            document.getElementById('swap-usage-detail').textContent = d.swap_percent ? d.swap_percent.toFixed(1) + '%' : '0%';
+
+            const diskTotal = d.disk_total_gb || 0;
+            const diskUsed = d.disk_used_gb || 0;
+            document.getElementById('disk-total-detail').textContent = diskTotal.toFixed(2) + ' TB';
+            document.getElementById('disk-used-detail').textContent = diskUsed.toFixed(2) + ' TB';
+            document.getElementById('disk-free-detail').textContent = (diskTotal - diskUsed).toFixed(2) + ' TB';
+            document.getElementById('disk-usage-detail').textContent = d.disk_percent ? d.disk_percent.toFixed(1) + '%' : '0%';
+
+            const totalTraffic = d.total_traffic_mb || 0;
+            document.getElementById('network-total').textContent = totalTraffic.toFixed(2) + ' MB';
+            document.getElementById('network-requests').textContent = d.total_requests || 0;
+            document.getElementById('network-connections').textContent = d.active_connections || 0;
+            document.getElementById('network-errors').textContent = d.total_errors || 0;
+
+            document.getElementById('sys-uptime').textContent = d.uptime || '00:00:00';
+            document.getElementById('sys-active-configs').textContent = d.active_links || 0;
+            document.getElementById('sys-total-configs').textContent = d.links_count || 0;
+            document.getElementById('sys-expired-configs').textContent = d.expired_links || 0;
+
+        } catch (e) {
+            console.error('Error updating system details:', e);
+        }
+    }
+
+    // Change Password
+    async function changePassword() {
+        const cur = document.getElementById('settings-current-pw').value;
+        const nw = document.getElementById('settings-new-pw').value;
+        const confirmPw = document.getElementById('settings-confirm-pw').value;
+        const errEl = document.getElementById('settingsError');
+        errEl.classList.add('hidden');
+
+        if (!cur || !nw || !confirmPw) {
+            errEl.textContent = 'All fields are required.';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        if (nw.length < 4) {
+            errEl.textContent = 'New password must be at least 4 characters.';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        if (nw !== confirmPw) {
+            errEl.textContent = 'New password and confirmation do not match.';
+            errEl.classList.remove('hidden');
+            return;
         }
 
-        // ---- Update System Details ----
-        async function updateSystemDetails() {
-            try {
-                const res = await fetch('/stats');
-                const d = await res.json();
+        try {
+            const res = await fetch('/api/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ current_password: cur, new_password: nw })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || 'Failed to update password');
 
-                document.getElementById('cpu-load-avg').textContent = d.cpu_percent ? d.cpu_percent.toFixed(1) + '%' : '--';
-                document.getElementById('cpu-cores-detail').textContent = d.cpu_cores ? d.cpu_cores + ' Cores' : '--';
-                const cpuPct = d.cpu_percent || 0;
-                document.getElementById('cpu-user').textContent = (cpuPct * 0.7).toFixed(1) + '%';
-                document.getElementById('cpu-system').textContent = (cpuPct * 0.3).toFixed(1) + '%';
-                document.getElementById('cpu-idle').textContent = (100 - cpuPct).toFixed(1) + '%';
+            toggleModal('settingsModal', false);
+            triggerAlert('Password Updated', 'Your password has been changed successfully. You will be logged out.', 'check-circle');
 
-                const ramTotal = d.ram_total_mb || 0;
-                const ramUsed = d.ram_used_mb || 0;
-                document.getElementById('ram-total-detail').textContent = (ramTotal / 1024).toFixed(2) + ' GB';
-                document.getElementById('ram-used-detail').textContent = (ramUsed / 1024).toFixed(2) + ' GB';
-                document.getElementById('ram-free-detail').textContent = ((ramTotal - ramUsed) / 1024).toFixed(2) + ' GB';
-                document.getElementById('ram-available-detail').textContent = ((ramTotal - ramUsed) / 1024).toFixed(2) + ' GB';
-                document.getElementById('ram-cached-detail').textContent = ((ramTotal - ramUsed) * 0.3 / 1024).toFixed(2) + ' GB';
+            setTimeout(async () => {
+                try {
+                    await fetch('/api/logout', { method: 'POST' });
+                    const paths = await getCurrentPaths();
+                    location.href = paths.login;
+                } catch (e) {
+                    location.href = '/login';
+                }
+            }, 2000);
 
-                const swapTotal = d.swap_total_mb || 0;
-                const swapUsed = d.swap_used_mb || 0;
-                document.getElementById('swap-total-detail').textContent = (swapTotal / 1024).toFixed(2) + ' GB';
-                document.getElementById('swap-used-detail').textContent = (swapUsed / 1024).toFixed(2) + ' GB';
-                document.getElementById('swap-free-detail').textContent = ((swapTotal - swapUsed) / 1024).toFixed(2) + ' GB';
-                document.getElementById('swap-usage-detail').textContent = d.swap_percent ? d.swap_percent.toFixed(1) + '%' : '0%';
+        } catch (e) {
+            errEl.textContent = e.message;
+            errEl.classList.remove('hidden');
+        }
+    }
 
-                const diskTotal = d.disk_total_gb || 0;
-                const diskUsed = d.disk_used_gb || 0;
-                document.getElementById('disk-total-detail').textContent = diskTotal.toFixed(2) + ' TB';
-                document.getElementById('disk-used-detail').textContent = diskUsed.toFixed(2) + ' TB';
-                document.getElementById('disk-free-detail').textContent = (diskTotal - diskUsed).toFixed(2) + ' TB';
-                document.getElementById('disk-usage-detail').textContent = d.disk_percent ? d.disk_percent.toFixed(1) + '%' : '0%';
+    // ---- Settings: update paths ----
+    async function updatePath(type) {
+        const errEl = document.getElementById('pathSettingsError');
+        errEl.classList.add('hidden');
 
-                const totalTraffic = d.total_traffic_mb || 0;
-                document.getElementById('network-total').textContent = totalTraffic.toFixed(2) + ' MB';
-                document.getElementById('network-requests').textContent = d.total_requests || 0;
-                document.getElementById('network-connections').textContent = d.active_connections || 0;
-                document.getElementById('network-errors').textContent = d.total_errors || 0;
-
-                document.getElementById('sys-uptime').textContent = d.uptime || '00:00:00';
-                document.getElementById('sys-active-configs').textContent = d.active_links || 0;
-                document.getElementById('sys-total-configs').textContent = d.links_count || 0;
-                document.getElementById('sys-expired-configs').textContent = d.expired_links || 0;
-
-            } catch (e) {
-                console.error('Error updating system details:', e);
-            }
+        let pathInput;
+        if (type === 'dashboard') {
+            pathInput = document.getElementById('settings-dashboard-path');
+        } else if (type === 'login') {
+            pathInput = document.getElementById('settings-login-path');
+        } else if (type === 'sub') {
+            pathInput = document.getElementById('settings-sub-path');
+        } else if (type === 'setup') {
+            pathInput = document.getElementById('settings-setup-path');
         }
 
-        // Change Password
-        async function changePassword() {
-            const cur = document.getElementById('settings-current-pw').value;
-            const nw = document.getElementById('settings-new-pw').value;
-            const confirmPw = document.getElementById('settings-confirm-pw').value;
-            const errEl = document.getElementById('settingsError');
-            errEl.classList.add('hidden');
-
-            if (!cur || !nw || !confirmPw) {
-                errEl.textContent = 'All fields are required.';
-                errEl.classList.remove('hidden');
-                return;
-            }
-            if (nw.length < 4) {
-                errEl.textContent = 'New password must be at least 4 characters.';
-                errEl.classList.remove('hidden');
-                return;
-            }
-            if (nw !== confirmPw) {
-                errEl.textContent = 'New password and confirmation do not match.';
-                errEl.classList.remove('hidden');
-                return;
-            }
-
-            try {
-                const res = await fetch('/api/change-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ current_password: cur, new_password: nw })
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.detail || 'Failed to update password');
-
-                toggleModal('settingsModal', false);
-                triggerAlert('Password Updated', 'Your password has been changed successfully. You will be logged out.', 'check-circle');
-
-                setTimeout(async () => {
-                    try {
-                        await fetch('/api/logout', { method: 'POST' });
-                        const paths = await getCurrentPaths();
-                        location.href = paths.login;
-                    } catch (e) {
-                        location.href = '/login';
-                    }
-                }, 2000);
-
-            } catch (e) {
-                errEl.textContent = e.message;
-                errEl.classList.remove('hidden');
-            }
+        let newPath = pathInput.value.trim();
+        if (!newPath) {
+            errEl.textContent = 'Path cannot be empty.';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        if (!newPath.startsWith('/')) {
+            newPath = '/' + newPath;
+        }
+        if (!/^\/[a-zA-Z0-9\-_/]*$/.test(newPath)) {
+            errEl.textContent = 'Path must start with / and contain only letters, numbers, hyphens, underscores, and slashes.';
+            errEl.classList.remove('hidden');
+            return;
         }
 
-        // ---- Settings: update paths ----
-        async function updatePath(type) {
-            const errEl = document.getElementById('pathSettingsError');
-            errEl.classList.add('hidden');
+        try {
+            const res = await fetch('/api/update-path', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path_type: type, new_path: newPath })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || 'Failed to update path');
 
-            let pathInput;
+            document.getElementById('current-' + type + '-path').textContent = newPath;
+            pathInput.value = '';
+            triggerAlert('Path Updated', type.charAt(0).toUpperCase() + type.slice(1) + ' path changed to: ' + newPath, 'check-circle');
+
             if (type === 'dashboard') {
-                pathInput = document.getElementById('settings-dashboard-path');
-            } else if (type === 'login') {
-                pathInput = document.getElementById('settings-login-path');
-            } else if (type === 'sub') {
-                pathInput = document.getElementById('settings-sub-path');
-            } else if (type === 'setup') {
-                pathInput = document.getElementById('settings-setup-path');
+                setTimeout(() => {
+                    location.href = newPath;
+                }, 1500);
             }
-
-            let newPath = pathInput.value.trim();
-            if (!newPath) {
-                errEl.textContent = 'Path cannot be empty.';
-                errEl.classList.remove('hidden');
-                return;
+            if (type === 'setup') {
+                setTimeout(() => {
+                    location.href = newPath;
+                }, 1500);
             }
-            if (!newPath.startsWith('/')) {
-                newPath = '/' + newPath;
-            }
-            if (!/^\/[a-zA-Z0-9\-_/]*$/.test(newPath)) {
-                errEl.textContent = 'Path must start with / and contain only letters, numbers, hyphens, underscores, and slashes.';
-                errEl.classList.remove('hidden');
-                return;
-            }
-
-            try {
-                const res = await fetch('/api/update-path', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path_type: type, new_path: newPath })
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.detail || 'Failed to update path');
-
-                document.getElementById('current-' + type + '-path').textContent = newPath;
-                pathInput.value = '';
-                triggerAlert('Path Updated', type.charAt(0).toUpperCase() + type.slice(1) + ' path changed to: ' + newPath, 'check-circle');
-
-                if (type === 'dashboard') {
-                    setTimeout(() => {
-                        location.href = newPath;
-                    }, 1500);
-                }
-                if (type === 'setup') {
-                    setTimeout(() => {
-                        location.href = newPath;
-                    }, 1500);
-                }
-            } catch (e) {
-                errEl.textContent = e.message;
-                errEl.classList.remove('hidden');
-            }
+        } catch (e) {
+            errEl.textContent = e.message;
+            errEl.classList.remove('hidden');
         }
+    }
 
-        // ---- Load current paths ----
-        async function loadSettingsPaths() {
-            try {
-                const res = await fetch('/api/get-paths');
-                const data = await res.json();
+    // ---- Load current paths ----
+    async function loadSettingsPaths() {
+        try {
+            const res = await fetch('/api/get-paths');
+            const data = await res.json();
 
-                document.getElementById('current-dashboard-path').textContent = data.dashboard_path || '/dashboard';
-                document.getElementById('current-login-path').textContent = data.login_path || '/login';
-                document.getElementById('current-sub-path').textContent = data.sub_path || '/sub';
-                document.getElementById('current-setup-path').textContent = data.setup_path || '/setup';
+            document.getElementById('current-dashboard-path').textContent = data.dashboard_path || '/dashboard';
+            document.getElementById('current-login-path').textContent = data.login_path || '/login';
+            document.getElementById('current-sub-path').textContent = data.sub_path || '/sub';
+            document.getElementById('current-setup-path').textContent = data.setup_path || '/setup';
 
-                const dashboardInput = document.getElementById('settings-dashboard-path');
-                const loginInput = document.getElementById('settings-login-path');
-                const subInput = document.getElementById('settings-sub-path');
-                const setupInput = document.getElementById('settings-setup-path');
+            const dashboardInput = document.getElementById('settings-dashboard-path');
+            const loginInput = document.getElementById('settings-login-path');
+            const subInput = document.getElementById('settings-sub-path');
+            const setupInput = document.getElementById('settings-setup-path');
 
-                if (dashboardInput) dashboardInput.placeholder = data.dashboard_path || '/dashboard';
-                if (loginInput) loginInput.placeholder = data.login_path || '/login';
-                if (subInput) subInput.placeholder = data.sub_path || '/sub';
-                if (setupInput) setupInput.placeholder = data.setup_path || '/setup';
-            } catch (e) {
-                console.error('Error loading paths:', e);
-            }
+            if (dashboardInput) dashboardInput.placeholder = data.dashboard_path || '/dashboard';
+            if (loginInput) loginInput.placeholder = data.login_path || '/login';
+            if (subInput) subInput.placeholder = data.sub_path || '/sub';
+            if (setupInput) setupInput.placeholder = data.setup_path || '/setup';
+        } catch (e) {
+            console.error('Error loading paths:', e);
         }
+    }
 
-        // ---- Reset Traffic ----
-        async function resetTraffic(uuid) {
-            const ok = await customConfirm('Reset traffic for this configuration?');
-            if (!ok) return;
-            try {
-                const res = await fetch('/api/links/' + uuid + '/reset-traffic', { method: 'POST' });
-                if (!res.ok) throw new Error('Failed');
-                toast('Traffic reset successfully', 'success');
-                loadConfigs();
-            } catch (e) {
-                toast('Error resetting traffic', 'error');
-            }
+    // ---- Reset Traffic ----
+    async function resetTraffic(uuid) {
+        const ok = await customConfirm('Reset traffic for this configuration?');
+        if (!ok) return;
+        try {
+            const res = await fetch('/api/links/' + uuid + '/reset-traffic', { method: 'POST' });
+            if (!res.ok) throw new Error('Failed');
+            toast('Traffic reset successfully', 'success');
+            loadConfigs();
+        } catch (e) {
+            toast('Error resetting traffic', 'error');
         }
+    }
 
-        // ---- Toggle Config Status ----
-        async function toggleConfigStatus(uuid, enabled) {
-            try {
-                const res = await fetch('/api/links/' + uuid + '/toggle', {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ active: enabled })
-                });
-                if (!res.ok) throw new Error('Failed to toggle status');
-                const data = await res.json();
+    // ---- Toggle Config Status ----
+    async function toggleConfigStatus(uuid, enabled) {
+        try {
+            const res = await fetch('/api/links/' + uuid + '/toggle', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active: enabled })
+            });
+            if (!res.ok) throw new Error('Failed to toggle status');
+            const data = await res.json();
 
-                const row = document.querySelector(`.config-row[data-uuid="${uuid}"]`);
-                if (row) {
-                    const statusSpan = row.querySelector('.text-emerald-400, .text-red-400');
-                    const statusDot = statusSpan?.querySelector('.status-dot');
+            const row = document.querySelector(`.config-row[data-uuid="${uuid}"]`);
+            if (row) {
+                const statusSpan = row.querySelector('.text-emerald-400, .text-red-400');
+                const statusDot = statusSpan?.querySelector('.status-dot');
 
-                    if (statusSpan && statusDot) {
-                        if (enabled) {
-                            statusSpan.className = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20 text-[8px] sm:text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 font-english';
-                            statusSpan.innerHTML = `<span class="status-dot active"></span>Active`;
-                            statusDot.className = 'status-dot active';
-                        } else {
-                            statusSpan.className = 'text-red-400 bg-red-500/10 border-red-500/20 text-[8px] sm:text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 font-english';
-                            statusSpan.innerHTML = `<span class="status-dot inactive"></span>Inactive`;
-                            statusDot.className = 'status-dot inactive';
-                        }
-                    }
-
-                    const toggleLabel = row.querySelector('.group .toggle-label');
-                    if (toggleLabel) {
-                        toggleLabel.textContent = enabled ? 'Enabled' : 'Disabled';
+                if (statusSpan && statusDot) {
+                    if (enabled) {
+                        statusSpan.className = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20 text-[8px] sm:text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 font-english';
+                        statusSpan.innerHTML = `<span class="status-dot active"></span>Active`;
+                        statusDot.className = 'status-dot active';
+                    } else {
+                        statusSpan.className = 'text-red-400 bg-red-500/10 border-red-500/20 text-[8px] sm:text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 font-english';
+                        statusSpan.innerHTML = `<span class="status-dot inactive"></span>Inactive`;
+                        statusDot.className = 'status-dot inactive';
                     }
                 }
 
-                toast('Config ' + (enabled ? 'enabled' : 'disabled'), 'success');
-            } catch (e) {
-                toast('Error toggling status', 'error');
-                const checkbox = document.querySelector(`.config-row[data-uuid="${uuid}"] input[type="checkbox"]`);
-                if (checkbox) {
-                    checkbox.checked = !enabled;
+                const toggleLabel = row.querySelector('.group .toggle-label');
+                if (toggleLabel) {
+                    toggleLabel.textContent = enabled ? 'Enabled' : 'Disabled';
                 }
             }
-        }
 
-        // ===== IP SUGGESTIONS =====
-        let currentSuggestedIPs = [];
-
-        async function fetchSuggestions() {
-            try {
-                const res = await fetch('/api/ips/suggest');
-                const data = await res.json();
-                currentSuggestedIPs = data.ips || [];
-
-                const container = document.getElementById('suggestList');
-                if (!currentSuggestedIPs.length) {
-                    container.innerHTML = '<p class="col-span-full text-center text-slate-500 text-sm font-english">No IPs available in the list.</p>';
-                    document.getElementById('applySuggestBtn').disabled = true;
-                    document.getElementById('applyStatus').textContent = 'No IPs loaded';
-                    return;
-                }
-
-                container.innerHTML = currentSuggestedIPs.map(ip => `
-                    <div class="flex items-center gap-1 bg-slate-800/60 p-1.5 rounded-lg border border-slate-700/50">
-                        <input type="checkbox" class="suggest-ip-checkbox w-3.5 h-3.5" value="${ip}" checked>
-                        <span class="text-xs font-mono text-slate-200 truncate font-english">${ip}</span>
-                    </div>
-                `).join('');
-
-                await loadApplyTargetsForSuggest();
-                updateSuggestApplyButton();
-                document.getElementById('applyStatus').textContent = `${currentSuggestedIPs.length} IP(s) loaded`;
-            } catch (e) {
-                console.error('Fetch suggestions error:', e);
-                toast('Failed to load IP suggestions', 'error');
+            toast('Config ' + (enabled ? 'enabled' : 'disabled'), 'success');
+        } catch (e) {
+            toast('Error toggling status', 'error');
+            const checkbox = document.querySelector(`.config-row[data-uuid="${uuid}"] input[type="checkbox"]`);
+            if (checkbox) {
+                checkbox.checked = !enabled;
             }
         }
+    }
 
-        async function loadApplyTargetsForSuggest() {
-            try {
-                const res = await fetch('/api/links');
-                const data = await res.json();
-                const links = data.links || [];
-                const container = document.getElementById('applyTargetList');
+    // ===== IP SUGGESTIONS =====
+    let currentSuggestedIPs = [];
 
-                if (!links.length) {
-                    container.innerHTML = '<p class="text-[11px] text-slate-500 font-english">No configs — a new one will be created automatically.</p>';
-                    return;
+    async function fetchSuggestions() {
+        try {
+            const res = await fetch('/api/ips/suggest');
+            const data = await res.json();
+            currentSuggestedIPs = data.ips || [];
+
+            const container = document.getElementById('suggestList');
+            if (!currentSuggestedIPs.length) {
+                container.innerHTML = '<p class="col-span-full text-center text-slate-500 text-sm font-english">No IPs available in the list.</p>';
+                document.getElementById('applySuggestBtn').disabled = true;
+                document.getElementById('applyStatus').textContent = 'No IPs loaded';
+                return;
+            }
+
+            container.innerHTML = currentSuggestedIPs.map(ip => `
+                <div class="flex items-center gap-1 bg-slate-800/60 p-1.5 rounded-lg border border-slate-700/50">
+                    <input type="checkbox" class="suggest-ip-checkbox w-3.5 h-3.5" value="${ip}" checked>
+                    <span class="text-xs font-mono text-slate-200 truncate font-english">${ip}</span>
+                </div>
+            `).join('');
+
+            // Attach change listeners to IP checkboxes for dynamic button state
+            container.querySelectorAll('.suggest-ip-checkbox').forEach(cb => {
+                cb.addEventListener('change', updateSuggestApplyButton);
+            });
+
+            await loadApplyTargetsForSuggest();
+            updateSuggestApplyButton();
+            document.getElementById('applyStatus').textContent = `${currentSuggestedIPs.length} IP(s) loaded`;
+        } catch (e) {
+            console.error('Fetch suggestions error:', e);
+            toast('Failed to load IP suggestions', 'error');
+        }
+    }
+
+    async function loadApplyTargetsForSuggest() {
+        try {
+            const res = await fetch('/api/links');
+            const data = await res.json();
+            const links = data.links || [];
+            const container = document.getElementById('applyTargetList');
+
+            if (!links.length) {
+                container.innerHTML = '<p class="text-[11px] text-slate-500 font-english">No configs — a new one will be created automatically.</p>';
+                document.getElementById('applySuggestBtn').disabled = false;
+                return;
+            }
+
+            container.innerHTML = links.map(l => `
+                <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer font-mixed">
+                    <input type="checkbox" class="suggest-target-checkbox w-3.5 h-3.5" value="${l.uuid}">
+                    <span class="truncate">${l.label}</span>
+                    ${l.applied_ips_count ? `<span class="text-[9px] text-cyan-400 font-mono shrink-0">(${l.applied_ips_count} IP${l.applied_ips_count > 1 ? 's' : ''})</span>` : ''}
+                </label>
+            `).join('');
+
+            // Also update button when target checkboxes change (optional)
+            container.querySelectorAll('.suggest-target-checkbox').forEach(cb => {
+                cb.addEventListener('change', updateSuggestApplyButton);
+            });
+
+            updateSuggestApplyButton();
+        } catch (e) {
+            console.error('Load targets error:', e);
+        }
+    }
+
+    // ===== FIXED: Enable button based on IP selection, not target selection =====
+    function updateSuggestApplyButton() {
+        const ipCheckboxes = document.querySelectorAll('.suggest-ip-checkbox:checked');
+        const applyBtn = document.getElementById('applySuggestBtn');
+        applyBtn.disabled = (ipCheckboxes.length === 0);
+    }
+
+    async function applySuggestedIPs() {
+        // Get selected IPs
+        const ipCheckboxes = document.querySelectorAll('.suggest-ip-checkbox:checked');
+        const selectedIPs = Array.from(ipCheckboxes).map(cb => cb.value);
+        if (!selectedIPs.length) {
+            toast('Select at least one IP to apply', 'error');
+            return;
+        }
+
+        // Get target configs (may be empty)
+        const targetCheckboxes = document.querySelectorAll('.suggest-target-checkbox:checked');
+        const targetUUIDs = Array.from(targetCheckboxes).map(cb => cb.value);
+
+        const confirmApply = await customConfirm(
+            `Apply ${selectedIPs.length} IP(s) to ${targetUUIDs.length || 'a new'} config(s)?`
+        );
+        if (!confirmApply) return;
+
+        const btn = document.getElementById('applySuggestBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Applying...';
+
+        try {
+            const res = await fetch('/api/ips/apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ips: selectedIPs, target_uuids: targetUUIDs })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || 'Apply failed');
+            }
+            const data = await res.json();
+            toast(`✅ ${data.message || 'IPs applied successfully'}`, 'success');
+            loadConfigs();
+            document.getElementById('applyStatus').textContent = `Applied to ${data.applied?.length || 0} config(s)`;
+        } catch (e) {
+            toast('Error: ' + e.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i> Apply to Selected';
+            lucide.createIcons();
+        }
+    }
+
+    // ---- Fetch and render configs ----
+    async function loadConfigs() {
+        try {
+            const res = await fetch('/api/links');
+            if (!res.ok) throw new Error('Unauthorized');
+            const data = await res.json();
+            const links = data.links || [];
+            const container = document.getElementById('config-list');
+            if (!links.length) {
+                container.innerHTML = '<div class="p-6 text-center text-slate-400 text-sm font-english">No configurations yet. Click "Add Config" to create one.</div>';
+                return;
+            }
+            container.innerHTML = links.map(l => {
+                const protoLabels = {
+                    'vless-ws': 'VLESS',
+                    'xhttp-packet-up': 'XHTTP',
+                    'xhttp-stream-up': 'XHTTP'
+                };
+                const proto = l.protocol || 'vless-ws';
+                const label = l.label || 'Unnamed';
+                const isDefault = l.is_default || false;
+                const active = l.active && !l.expired;
+                const limit = l.limit_bytes === 0 ? '∞' : fmtBytes(l.limit_bytes);
+                const used = fmtBytes(l.used_bytes || 0);
+                const pct = l.limit_bytes === 0 ? 0 : Math.min(100, (l.used_bytes / l.limit_bytes) * 100);
+                const color = pct > 90 ? '#ef4444' : pct > 70 ? '#f59e0b' : '#3b82f6';
+                let speedDisplay = '∞';
+                if (l.speed_limit_bytes && l.speed_limit_bytes > 0) {
+                    speedDisplay = (l.speed_limit_bytes * 8 / 1024 / 1024).toFixed(1) + ' Mbps';
                 }
+                const statusDot = active ? 'status-dot active' : 'status-dot inactive';
+                const statusText = active ? 'Active' : 'Inactive';
+                const statusClass = active ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                    'text-red-400 bg-red-500/10 border-red-500/20';
+                const appliedIps = l.applied_ips_count || 0;
 
-                container.innerHTML = links.map(l => `
-                    <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer font-mixed">
-                        <input type="checkbox" class="suggest-target-checkbox w-3.5 h-3.5" value="${l.uuid}">
-                        <span class="truncate">${l.label}</span>
-                        ${l.applied_ips_count ? `<span class="text-[9px] text-cyan-400 font-mono shrink-0">(${l.applied_ips_count} IP${l.applied_ips_count > 1 ? 's' : ''})</span>` : ''}
+                const actionButtons = isDefault ? `
+                    <span class="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 font-english" title="Default configuration - cannot be modified">
+                        <i data-lucide="shield" class="w-3 h-3 inline mr-1"></i>Protected
+                    </span>
+                ` : `
+                    <button onclick="openEditModal('${label}','${proto}','${l.fingerprint||'chrome'}','${l.alpn||''}',${l.limit_bytes ? (l.limit_bytes / 1024 / 1024) : 0},${l.expires_at ? Math.ceil((new Date(l.expires_at) - Date.now()) / (86400000)) : 0},${l.ip_limit||0},${l.speed_limit_bytes ? (l.speed_limit_bytes * 8 / 1024 / 1024) : 0},'${l.speed_limit_unit || 'MBIT'}','${l.uuid}')" class="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl transition-all duration-300" title="Edit"><i data-lucide="edit-3" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
+                    <button onclick="resetTraffic('${l.uuid}')" class="p-1.5 sm:p-2 bg-blue-800/20 hover:bg-blue-800/40 border border-blue-700/30 text-blue-300 rounded-xl transition-all duration-300" title="Reset Traffic"><i data-lucide="rotate-ccw" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
+                    <button onclick="deleteConfig('${l.uuid}')" class="p-1.5 sm:p-2 bg-red-800/20 hover:bg-red-800/40 border border-red-700/30 text-red-300 rounded-xl transition-all duration-300" title="Delete"><i data-lucide="trash-2" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
+                `;
+
+                const toggleHtml = isDefault ? `
+                    <label class="relative inline-flex items-center cursor-not-allowed group shrink-0 opacity-60">
+                        <input type="checkbox" class="sr-only" ${active ? 'checked' : ''} disabled>
+                        <div class="w-9 h-5 bg-slate-600 rounded-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${active ? 'after:translate-x-full' : ''}"></div>
+                        <span class="toggle-label transition-all duration-300 font-english">${active ? 'Enabled' : 'Disabled'}</span>
                     </label>
-                `).join('');
+                ` : `
+                    <label class="relative inline-flex items-center cursor-pointer group shrink-0">
+                        <input type="checkbox" class="sr-only peer" ${active ? 'checked' : ''} onchange="toggleConfigStatus('${l.uuid}', this.checked)">
+                        <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600 peer-checked:border-emerald-600"></div>
+                        <span class="toggle-label transition-all duration-300 group-hover:text-slate-200 font-english">${active ? 'Enabled' : 'Disabled'}</span>
+                    </label>
+                `;
 
-                updateSuggestApplyButton();
-            } catch (e) {
-                console.error('Load targets error:', e);
-            }
-        }
+                const defaultBadge = isDefault ? `<span class="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-mono font-english">Default</span>` : '';
+                const ipPoolBadge = appliedIps > 0 ? `<span class="text-[8px] bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded font-mono font-english">${appliedIps} Applied IP${appliedIps > 1 ? 's' : ''}</span>` : '';
 
-        function updateSuggestApplyButton() {
-            const checkboxes = document.querySelectorAll('.suggest-target-checkbox');
-            const applyBtn = document.getElementById('applySuggestBtn');
-            if (checkboxes.length === 0) {
-                applyBtn.disabled = false;
-                return;
-            }
-            const selected = document.querySelectorAll('.suggest-target-checkbox:checked').length;
-            applyBtn.disabled = (selected === 0);
-        }
-
-        async function applySuggestedIPs() {
-            // Get selected IPs
-            const ipCheckboxes = document.querySelectorAll('.suggest-ip-checkbox:checked');
-            const selectedIPs = Array.from(ipCheckboxes).map(cb => cb.value);
-            if (!selectedIPs.length) {
-                toast('Select at least one IP to apply', 'error');
-                return;
-            }
-
-            // Get target configs
-            const targetCheckboxes = document.querySelectorAll('.suggest-target-checkbox:checked');
-            const targetUUIDs = Array.from(targetCheckboxes).map(cb => cb.value);
-
-            // If no targets selected and there are configs, warn
-            if (document.querySelectorAll('.suggest-target-checkbox').length > 0 && targetUUIDs.length === 0) {
-                toast('Select at least one config or leave empty to create a new one', 'error');
-                return;
-            }
-
-            const confirmApply = await customConfirm(
-                `Apply ${selectedIPs.length} IP(s) to ${targetUUIDs.length || 'a new'} config(s)?`
-            );
-            if (!confirmApply) return;
-
-            const btn = document.getElementById('applySuggestBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Applying...';
-
-            try {
-                const res = await fetch('/api/ips/apply', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ips: selectedIPs, target_uuids: targetUUIDs })
-                });
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.detail || 'Apply failed');
-                }
-                const data = await res.json();
-                toast(`✅ ${data.message || 'IPs applied successfully'}`, 'success');
-                loadConfigs();
-                document.getElementById('applyStatus').textContent = `Applied to ${data.applied?.length || 0} config(s)`;
-            } catch (e) {
-                toast('Error: ' + e.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i> Apply to Selected';
-                lucide.createIcons();
-            }
-        }
-
-        // ---- Fetch and render configs ----
-        async function loadConfigs() {
-            try {
-                const res = await fetch('/api/links');
-                if (!res.ok) throw new Error('Unauthorized');
-                const data = await res.json();
-                const links = data.links || [];
-                const container = document.getElementById('config-list');
-                if (!links.length) {
-                    container.innerHTML = '<div class="p-6 text-center text-slate-400 text-sm font-english">No configurations yet. Click "Add Config" to create one.</div>';
-                    return;
-                }
-                container.innerHTML = links.map(l => {
-                    const protoLabels = {
-                        'vless-ws': 'VLESS',
-                        'xhttp-packet-up': 'XHTTP',
-                        'xhttp-stream-up': 'XHTTP'
-                    };
-                    const proto = l.protocol || 'vless-ws';
-                    const label = l.label || 'Unnamed';
-                    const isDefault = l.is_default || false;
-                    const active = l.active && !l.expired;
-                    const limit = l.limit_bytes === 0 ? '∞' : fmtBytes(l.limit_bytes);
-                    const used = fmtBytes(l.used_bytes || 0);
-                    const pct = l.limit_bytes === 0 ? 0 : Math.min(100, (l.used_bytes / l.limit_bytes) * 100);
-                    const color = pct > 90 ? '#ef4444' : pct > 70 ? '#f59e0b' : '#3b82f6';
-                    let speedDisplay = '∞';
-                    if (l.speed_limit_bytes && l.speed_limit_bytes > 0) {
-                        speedDisplay = (l.speed_limit_bytes * 8 / 1024 / 1024).toFixed(1) + ' Mbps';
-                    }
-                    const statusDot = active ? 'status-dot active' : 'status-dot inactive';
-                    const statusText = active ? 'Active' : 'Inactive';
-                    const statusClass = active ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
-                        'text-red-400 bg-red-500/10 border-red-500/20';
-                    const appliedIps = l.applied_ips_count || 0;
-
-                    const actionButtons = isDefault ? `
-                        <span class="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 font-english" title="Default configuration - cannot be modified">
-                            <i data-lucide="shield" class="w-3 h-3 inline mr-1"></i>Protected
-                        </span>
-                    ` : `
-                        <button onclick="openEditModal('${label}','${proto}','${l.fingerprint||'chrome'}','${l.alpn||''}',${l.limit_bytes ? (l.limit_bytes / 1024 / 1024) : 0},${l.expires_at ? Math.ceil((new Date(l.expires_at) - Date.now()) / (86400000)) : 0},${l.ip_limit||0},${l.speed_limit_bytes ? (l.speed_limit_bytes * 8 / 1024 / 1024) : 0},'${l.speed_limit_unit || 'MBIT'}','${l.uuid}')" class="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl transition-all duration-300" title="Edit"><i data-lucide="edit-3" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
-                        <button onclick="resetTraffic('${l.uuid}')" class="p-1.5 sm:p-2 bg-blue-800/20 hover:bg-blue-800/40 border border-blue-700/30 text-blue-300 rounded-xl transition-all duration-300" title="Reset Traffic"><i data-lucide="rotate-ccw" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
-                        <button onclick="deleteConfig('${l.uuid}')" class="p-1.5 sm:p-2 bg-red-800/20 hover:bg-red-800/40 border border-red-700/30 text-red-300 rounded-xl transition-all duration-300" title="Delete"><i data-lucide="trash-2" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
-                    `;
-
-                    const toggleHtml = isDefault ? `
-                        <label class="relative inline-flex items-center cursor-not-allowed group shrink-0 opacity-60">
-                            <input type="checkbox" class="sr-only" ${active ? 'checked' : ''} disabled>
-                            <div class="w-9 h-5 bg-slate-600 rounded-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${active ? 'after:translate-x-full' : ''}"></div>
-                            <span class="toggle-label transition-all duration-300 font-english">${active ? 'Enabled' : 'Disabled'}</span>
-                        </label>
-                    ` : `
-                        <label class="relative inline-flex items-center cursor-pointer group shrink-0">
-                            <input type="checkbox" class="sr-only peer" ${active ? 'checked' : ''} onchange="toggleConfigStatus('${l.uuid}', this.checked)">
-                            <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600 peer-checked:border-emerald-600"></div>
-                            <span class="toggle-label transition-all duration-300 group-hover:text-slate-200 font-english">${active ? 'Enabled' : 'Disabled'}</span>
-                        </label>
-                    `;
-
-                    const defaultBadge = isDefault ? `<span class="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-mono font-english">Default</span>` : '';
-                    const ipPoolBadge = appliedIps > 0 ? `<span class="text-[8px] bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded font-mono font-english">${appliedIps} Applied IP${appliedIps > 1 ? 's' : ''}</span>` : '';
-
-                    return `
-                    <div class="p-4 sm:p-6 config-row transition-all duration-200 hover:bg-slate-800/20 ${isDefault ? 'border-l-2 border-amber-500/50' : ''}" data-uuid="${l.uuid}">
-                        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
-                            <div class="flex items-start space-x-3 sm:space-x-4 min-w-0">
-                                <span class="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-md text-[9px] sm:text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-wide mt-0.5 font-mono shrink-0 font-english">${protoLabels[proto] || proto}</span>
-                                <div class="min-w-0 flex-1">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <h3 class="text-sm sm:text-base font-semibold text-slate-200 truncate font-mixed">${label}</h3>
-                                        ${defaultBadge}
-                                        ${ipPoolBadge}
-                                        <span class="text-[8px] sm:text-[10px] px-1.5 py-0.5 rounded font-medium ${statusClass} shrink-0 transition-all duration-300 font-english">
-                                            <span class="${statusDot}"></span>${statusText}
-                                        </span>
-                                    </div>
-                                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5 mt-1 text-[10px] sm:text-xs text-slate-400">
-                                        <div class="font-english">Network: <span class="text-slate-300 font-mono font-english">${proto.includes('ws') ? 'ws' : 'tcp'}</span></div>
-                                        <div class="font-english">Security: <span class="text-slate-300 font-mono font-english">tls</span></div>
-                                        <div class="col-span-2 sm:col-span-1 font-english">Expiry: <span class="text-slate-300 font-mono font-english">${l.expires_at ? new Date(l.expires_at).toISOString().slice(0,10) : 'Unlimited'}</span></div>
-                                    </div>
-                                    <div class="mt-1 flex flex-wrap items-center gap-2 sm:gap-4 text-[10px] sm:text-xs text-slate-400">
-                                        <span class="font-english">Usage: <span class="text-slate-300 font-mono font-english">${used} / ${limit}</span></span>
-                                        <span class="font-english">IP: <span class="text-slate-300 font-mono font-english">${l.ip_limit || '∞'}</span></span>
-                                        <span class="font-english">Speed: <span class="text-slate-300 font-mono font-english">${speedDisplay}</span></span>
-                                    </div>
-                                    <div class="w-full max-w-xs mt-1.5 h-1.5 bg-slate-800/60 rounded-full overflow-hidden">
-                                        <div class="h-full rounded-full transition-all duration-500" style="width: ${pct}%; background: ${color};"></div>
-                                    </div>
+                return `
+                <div class="p-4 sm:p-6 config-row transition-all duration-200 hover:bg-slate-800/20 ${isDefault ? 'border-l-2 border-amber-500/50' : ''}" data-uuid="${l.uuid}">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
+                        <div class="flex items-start space-x-3 sm:space-x-4 min-w-0">
+                            <span class="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-md text-[9px] sm:text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-wide mt-0.5 font-mono shrink-0 font-english">${protoLabels[proto] || proto}</span>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h3 class="text-sm sm:text-base font-semibold text-slate-200 truncate font-mixed">${label}</h3>
+                                    ${defaultBadge}
+                                    ${ipPoolBadge}
+                                    <span class="text-[8px] sm:text-[10px] px-1.5 py-0.5 rounded font-medium ${statusClass} shrink-0 transition-all duration-300 font-english">
+                                        <span class="${statusDot}"></span>${statusText}
+                                    </span>
                                 </div>
-                            </div>
-                            <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 lg:justify-end">
-                                ${toggleHtml}
-
-                                <div class="relative flex-grow sm:flex-grow-0 min-w-[180px] sm:min-w-[220px] max-w-full sm:max-w-xs">
-                                    <input type="text" id="uri-${l.uuid}" readonly value="${l.vless_link}" class="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 pr-7 sm:pr-10 text-[8px] sm:text-[10px] font-mono text-slate-400 focus:outline-none select-all truncate font-english">
-                                    <button onclick="copyLink('uri-${l.uuid}')" class="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 p-0.5 sm:p-1 text-slate-500 hover:text-slate-300 transition-all duration-300"><i data-lucide="copy" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5 mt-1 text-[10px] sm:text-xs text-slate-400">
+                                    <div class="font-english">Network: <span class="text-slate-300 font-mono font-english">${proto.includes('ws') ? 'ws' : 'tcp'}</span></div>
+                                    <div class="font-english">Security: <span class="text-slate-300 font-mono font-english">tls</span></div>
+                                    <div class="col-span-2 sm:col-span-1 font-english">Expiry: <span class="text-slate-300 font-mono font-english">${l.expires_at ? new Date(l.expires_at).toISOString().slice(0,10) : 'Unlimited'}</span></div>
                                 </div>
-                                <button onclick="openQrModal('${label}', '${l.vless_link}', '${l.sub_url}')" class="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl transition-all duration-300" title="QR"><i data-lucide="qr-code" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
-                                <button onclick="window.open('/sub/user?uuid=${l.uuid}', '_blank')" class="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl transition-all duration-300" title="Subscription"><i data-lucide="external-link" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
-                                ${actionButtons}
+                                <div class="mt-1 flex flex-wrap items-center gap-2 sm:gap-4 text-[10px] sm:text-xs text-slate-400">
+                                    <span class="font-english">Usage: <span class="text-slate-300 font-mono font-english">${used} / ${limit}</span></span>
+                                    <span class="font-english">IP: <span class="text-slate-300 font-mono font-english">${l.ip_limit || '∞'}</span></span>
+                                    <span class="font-english">Speed: <span class="text-slate-300 font-mono font-english">${speedDisplay}</span></span>
+                                </div>
+                                <div class="w-full max-w-xs mt-1.5 h-1.5 bg-slate-800/60 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full transition-all duration-500" style="width: ${pct}%; background: ${color};"></div>
+                                </div>
                             </div>
                         </div>
-                    </div>`;
-                }).join('');
-                lucide.createIcons();
-                updateStats();
-                if (systemDetailsVisible) {
-                    updateSystemDetails();
-                }
-            } catch (e) {
-                if (e.message.includes('Unauthorized')) location.href = '/login';
-            }
-        }
+                        <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 lg:justify-end">
+                            ${toggleHtml}
 
-        async function updateStats() {
-            try {
-                const res = await fetch('/stats');
-                const d = await res.json();
-                document.getElementById('uptime-display').textContent = d.uptime || '00:00:00';
-
-                document.getElementById('total-traffic').textContent = d.total_traffic_mb ? d.total_traffic_mb.toFixed(1) +
-                    ' MB' : '0 MB';
-                document.getElementById('total-usage').textContent = d.total_traffic_mb ? (d.total_traffic_mb / 1024).toFixed(
-                    2) + ' GB' : '0 GB';
-                document.getElementById('total-inbounds').textContent = d.links_count || 0;
-                document.getElementById('active-connections').textContent = d.active_connections || 0;
-
-                const cpuPct = d.cpu_percent || 0;
-                const cpuCores = d.cpu_cores || 0;
-                document.getElementById('ring-cpu-val').textContent = cpuCores + ' Cores';
-                document.getElementById('ring-cpu-pct').textContent = cpuPct.toFixed(1) + '%';
-                const cpuCircle = document.querySelector('.text-blue-500.circle-chart');
-                if (cpuCircle) cpuCircle.setAttribute('stroke-dasharray', Math.round(cpuPct) + ', 100');
-
-                const ramUsed = d.ram_used_mb || 0;
-                const ramTotal = d.ram_total_mb || 1;
-                const ramPct = d.ram_percent || 0;
-                document.getElementById('ring-ram-val').textContent = (ramUsed / 1024).toFixed(2) + ' / ' + (ramTotal /
-                    1024).toFixed(2) + ' GB';
-                document.getElementById('ring-ram-pct').textContent = ramPct.toFixed(1) + '%';
-                const ramCircle = document.querySelector('.text-indigo-500.circle-chart');
-                if (ramCircle) ramCircle.setAttribute('stroke-dasharray', Math.round(ramPct) + ', 100');
-
-                const swapUsed = d.swap_used_mb || 0;
-                const swapTotal = d.swap_total_mb || 1;
-                const swapPct = d.swap_percent || 0;
-                document.getElementById('ring-swap-val').textContent = (swapUsed / 1024).toFixed(2) + ' / ' + (swapTotal /
-                    1024).toFixed(2) + ' GB';
-                document.getElementById('ring-swap-pct').textContent = swapPct.toFixed(1) + '%';
-                const swapCircle = document.querySelector('.text-amber-500.circle-chart');
-                if (swapCircle) swapCircle.setAttribute('stroke-dasharray', Math.round(swapPct) + ', 100');
-
-                const diskUsed = d.disk_used_gb || 0;
-                const diskTotal = d.disk_total_gb || 1;
-                const diskPct = d.disk_percent || 0;
-                document.getElementById('ring-disk-val').textContent = diskUsed.toFixed(2) + ' / ' + diskTotal.toFixed(
-                    2) + ' TB';
-                document.getElementById('ring-disk-pct').textContent = diskPct.toFixed(1) + '%';
-                const diskCircle = document.querySelector('.text-rose-500.circle-chart');
-                if (diskCircle) diskCircle.setAttribute('stroke-dasharray', Math.round(diskPct) + ', 100');
-            } catch (e) { console.error(e); }
-        }
-
-        async function createConfig() {
-            const label = document.getElementById('new-label').value.trim() || 'New Config';
-            const protocol = document.getElementById('new-protocol').value;
-            const fp = document.getElementById('new-fp').value;
-            const alpn = document.getElementById('new-alpn').value.trim();
-            const limitMB = parseFloat(document.getElementById('new-limit').value) || 0;
-            const expiryDays = parseInt(document.getElementById('new-expiry').value) || 0;
-            const ipLimit = parseInt(document.getElementById('new-iplimit').value) || 0;
-            const speedVal = parseFloat(document.getElementById('new-speed').value) || 0;
-            const speedUnit = document.getElementById('new-speed-unit').value;
-
-            const body = {
-                label,
-                protocol,
-                fingerprint: fp,
-                alpn,
-                limit_value: limitMB,
-                limit_unit: 'MB',
-                expires_days: expiryDays,
-                ip_limit: ipLimit,
-                speed_limit_value: speedVal,
-                speed_limit_unit: speedUnit
-            };
-
-            try {
-                const res = await fetch('/api/links', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                if (!res.ok) throw new Error('Failed');
-                toggleModal('inboundModal', false);
-                toast('Config created successfully', 'success');
-                loadConfigs();
-                document.getElementById('new-label').value = '';
-                document.getElementById('new-alpn').value = '';
-                document.getElementById('new-speed').value = '0';
-                document.getElementById('new-limit').value = '0';
-                document.getElementById('new-expiry').value = '0';
-                document.getElementById('new-iplimit').value = '0';
-            } catch (e) {
-                toast('Error creating config', 'error');
-            }
-        }
-
-        async function saveEdit() {
-            const uuid = document.getElementById('edit-uuid').value;
-            const label = document.getElementById('edit-label').value.trim();
-            const protocol = document.getElementById('edit-protocol').value;
-            const fp = document.getElementById('edit-fp').value;
-            const alpn = document.getElementById('edit-alpn').value.trim();
-            const limitMB = parseFloat(document.getElementById('edit-limit').value) || 0;
-            const expiryDays = parseInt(document.getElementById('edit-expiry').value) || 0;
-            const ipLimit = parseInt(document.getElementById('edit-iplimit').value) || 0;
-            const speedVal = parseFloat(document.getElementById('edit-speed').value) || 0;
-            const speedUnit = document.getElementById('edit-speed-unit').value;
-
-            const body = {
-                label,
-                protocol,
-                fingerprint: fp,
-                alpn,
-                limit_value: limitMB,
-                limit_unit: 'MB',
-                expires_days: expiryDays,
-                ip_limit: ipLimit,
-                speed_limit_value: speedVal,
-                speed_limit_unit: speedUnit
-            };
-
-            try {
-                const res = await fetch('/api/links/' + uuid, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                if (!res.ok) throw new Error('Failed');
-                toggleModal('editModal', false);
-                toast('Config updated', 'success');
-                loadConfigs();
-            } catch (e) {
-                toast('Error updating config', 'error');
-            }
-        }
-
-        async function deleteConfig(uuid) {
-            const ok = await customConfirm('Delete this configuration? This action cannot be undone.');
-            if (!ok) return;
-            try {
-                const res = await fetch('/api/links/' + uuid, { method: 'DELETE' });
-                if (!res.ok) throw new Error('Failed');
-                toast('Config deleted', 'success');
-                loadConfigs();
-            } catch (e) {
-                toast('Error deleting', 'error');
-            }
-        }
-
-        // Initial load
-        loadConfigs();
-        setInterval(() => {
+                            <div class="relative flex-grow sm:flex-grow-0 min-w-[180px] sm:min-w-[220px] max-w-full sm:max-w-xs">
+                                <input type="text" id="uri-${l.uuid}" readonly value="${l.vless_link}" class="w-full bg-slate-950 border border-slate-800/80 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 pr-7 sm:pr-10 text-[8px] sm:text-[10px] font-mono text-slate-400 focus:outline-none select-all truncate font-english">
+                                <button onclick="copyLink('uri-${l.uuid}')" class="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 p-0.5 sm:p-1 text-slate-500 hover:text-slate-300 transition-all duration-300"><i data-lucide="copy" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
+                            </div>
+                            <button onclick="openQrModal('${label}', '${l.vless_link}', '${l.sub_url}')" class="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl transition-all duration-300" title="QR"><i data-lucide="qr-code" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
+                            <button onclick="window.open('/sub/user?uuid=${l.uuid}', '_blank')" class="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl transition-all duration-300" title="Subscription"><i data-lucide="external-link" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
+                            ${actionButtons}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+            lucide.createIcons();
             updateStats();
             if (systemDetailsVisible) {
                 updateSystemDetails();
             }
-        }, 5000);
-        setInterval(loadConfigs, 15000);
+        } catch (e) {
+            if (e.message.includes('Unauthorized')) location.href = '/login';
+        }
+    }
 
-        // Close modals on escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                document.querySelectorAll('.custom-modal-overlay.active').forEach(modal => {
-                    toggleModal(modal.id, false);
-                });
-            }
-        });
+    async function updateStats() {
+        try {
+            const res = await fetch('/stats');
+            const d = await res.json();
+            document.getElementById('uptime-display').textContent = d.uptime || '00:00:00';
 
-        // Close modals on overlay click
-        document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('custom-modal-overlay')) {
-                toggleModal(e.target.id, false);
-            }
-        });
-    </script>
+            document.getElementById('total-traffic').textContent = d.total_traffic_mb ? d.total_traffic_mb.toFixed(1) +
+                ' MB' : '0 MB';
+            document.getElementById('total-usage').textContent = d.total_traffic_mb ? (d.total_traffic_mb / 1024).toFixed(
+                2) + ' GB' : '0 GB';
+            document.getElementById('total-inbounds').textContent = d.links_count || 0;
+            document.getElementById('active-connections').textContent = d.active_connections || 0;
+
+            const cpuPct = d.cpu_percent || 0;
+            const cpuCores = d.cpu_cores || 0;
+            document.getElementById('ring-cpu-val').textContent = cpuCores + ' Cores';
+            document.getElementById('ring-cpu-pct').textContent = cpuPct.toFixed(1) + '%';
+            const cpuCircle = document.querySelector('.text-blue-500.circle-chart');
+            if (cpuCircle) cpuCircle.setAttribute('stroke-dasharray', Math.round(cpuPct) + ', 100');
+
+            const ramUsed = d.ram_used_mb || 0;
+            const ramTotal = d.ram_total_mb || 1;
+            const ramPct = d.ram_percent || 0;
+            document.getElementById('ring-ram-val').textContent = (ramUsed / 1024).toFixed(2) + ' / ' + (ramTotal /
+                1024).toFixed(2) + ' GB';
+            document.getElementById('ring-ram-pct').textContent = ramPct.toFixed(1) + '%';
+            const ramCircle = document.querySelector('.text-indigo-500.circle-chart');
+            if (ramCircle) ramCircle.setAttribute('stroke-dasharray', Math.round(ramPct) + ', 100');
+
+            const swapUsed = d.swap_used_mb || 0;
+            const swapTotal = d.swap_total_mb || 1;
+            const swapPct = d.swap_percent || 0;
+            document.getElementById('ring-swap-val').textContent = (swapUsed / 1024).toFixed(2) + ' / ' + (swapTotal /
+                1024).toFixed(2) + ' GB';
+            document.getElementById('ring-swap-pct').textContent = swapPct.toFixed(1) + '%';
+            const swapCircle = document.querySelector('.text-amber-500.circle-chart');
+            if (swapCircle) swapCircle.setAttribute('stroke-dasharray', Math.round(swapPct) + ', 100');
+
+            const diskUsed = d.disk_used_gb || 0;
+            const diskTotal = d.disk_total_gb || 1;
+            const diskPct = d.disk_percent || 0;
+            document.getElementById('ring-disk-val').textContent = diskUsed.toFixed(2) + ' / ' + diskTotal.toFixed(
+                2) + ' TB';
+            document.getElementById('ring-disk-pct').textContent = diskPct.toFixed(1) + '%';
+            const diskCircle = document.querySelector('.text-rose-500.circle-chart');
+            if (diskCircle) diskCircle.setAttribute('stroke-dasharray', Math.round(diskPct) + ', 100');
+        } catch (e) { console.error(e); }
+    }
+
+    async function createConfig() {
+        const label = document.getElementById('new-label').value.trim() || 'New Config';
+        const protocol = document.getElementById('new-protocol').value;
+        const fp = document.getElementById('new-fp').value;
+        const alpn = document.getElementById('new-alpn').value.trim();
+        const limitMB = parseFloat(document.getElementById('new-limit').value) || 0;
+        const expiryDays = parseInt(document.getElementById('new-expiry').value) || 0;
+        const ipLimit = parseInt(document.getElementById('new-iplimit').value) || 0;
+        const speedVal = parseFloat(document.getElementById('new-speed').value) || 0;
+        const speedUnit = document.getElementById('new-speed-unit').value;
+
+        const body = {
+            label,
+            protocol,
+            fingerprint: fp,
+            alpn,
+            limit_value: limitMB,
+            limit_unit: 'MB',
+            expires_days: expiryDays,
+            ip_limit: ipLimit,
+            speed_limit_value: speedVal,
+            speed_limit_unit: speedUnit
+        };
+
+        try {
+            const res = await fetch('/api/links', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) throw new Error('Failed');
+            toggleModal('inboundModal', false);
+            toast('Config created successfully', 'success');
+            loadConfigs();
+            document.getElementById('new-label').value = '';
+            document.getElementById('new-alpn').value = '';
+            document.getElementById('new-speed').value = '0';
+            document.getElementById('new-limit').value = '0';
+            document.getElementById('new-expiry').value = '0';
+            document.getElementById('new-iplimit').value = '0';
+        } catch (e) {
+            toast('Error creating config', 'error');
+        }
+    }
+
+    async function saveEdit() {
+        const uuid = document.getElementById('edit-uuid').value;
+        const label = document.getElementById('edit-label').value.trim();
+        const protocol = document.getElementById('edit-protocol').value;
+        const fp = document.getElementById('edit-fp').value;
+        const alpn = document.getElementById('edit-alpn').value.trim();
+        const limitMB = parseFloat(document.getElementById('edit-limit').value) || 0;
+        const expiryDays = parseInt(document.getElementById('edit-expiry').value) || 0;
+        const ipLimit = parseInt(document.getElementById('edit-iplimit').value) || 0;
+        const speedVal = parseFloat(document.getElementById('edit-speed').value) || 0;
+        const speedUnit = document.getElementById('edit-speed-unit').value;
+
+        const body = {
+            label,
+            protocol,
+            fingerprint: fp,
+            alpn,
+            limit_value: limitMB,
+            limit_unit: 'MB',
+            expires_days: expiryDays,
+            ip_limit: ipLimit,
+            speed_limit_value: speedVal,
+            speed_limit_unit: speedUnit
+        };
+
+        try {
+            const res = await fetch('/api/links/' + uuid, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) throw new Error('Failed');
+            toggleModal('editModal', false);
+            toast('Config updated', 'success');
+            loadConfigs();
+        } catch (e) {
+            toast('Error updating config', 'error');
+        }
+    }
+
+    async function deleteConfig(uuid) {
+        const ok = await customConfirm('Delete this configuration? This action cannot be undone.');
+        if (!ok) return;
+        try {
+            const res = await fetch('/api/links/' + uuid, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed');
+            toast('Config deleted', 'success');
+            loadConfigs();
+        } catch (e) {
+            toast('Error deleting', 'error');
+        }
+    }
+
+    // Initial load
+    loadConfigs();
+    setInterval(() => {
+        updateStats();
+        if (systemDetailsVisible) {
+            updateSystemDetails();
+        }
+    }, 5000);
+    setInterval(loadConfigs, 15000);
+
+    // Close modals on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.custom-modal-overlay.active').forEach(modal => {
+                toggleModal(modal.id, false);
+            });
+        }
+    });
+
+    // Close modals on overlay click
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('custom-modal-overlay')) {
+            toggleModal(e.target.id, false);
+        }
+    });
+</script>
 </body>
 </html>"""
 SUB_INFO_HTML = r"""<!DOCTYPE html>
