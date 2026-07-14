@@ -290,6 +290,11 @@ async def require_auth(request: Request):
     return token
 
 def get_client_ip(request: Request) -> str:
+    # اولویت با هدر CF-Connecting-IP (مخصوص کلادفلر)
+    cf_ip = request.headers.get("CF-Connecting-IP")
+    if cf_ip:
+        return cf_ip.strip()
+    
     fwd = request.headers.get("x-forwarded-for")
     if fwd:
         return fwd.split(",")[0].strip()
@@ -297,10 +302,25 @@ def get_client_ip(request: Request) -> str:
     if real_ip:
         return real_ip.strip()
     return request.client.host if request.client else "127.0.0.1"
-
 async def get_client_country(request: Request) -> tuple[str, str]:
-    ip_address = get_client_ip(request)
+    # ۱. ابتدا هدر CF-IPCountry را بررسی کن (ارسال شده توسط کلادفلر)
+    cf_country = request.headers.get("CF-IPCountry")
+    if cf_country:
+        # کد کشور دو حرفی (مثلاً IR, US, ...)
+        country_code = cf_country.upper()
+        # ایموجی را از دیکشنری دریافت کن
+        emoji = COUNTRY_EMOJIS.get(country_code, "🌍")
+        # برای نمایش نام کامل کشور، می‌توانیم از دیکشنری معکوس استفاده کنیم
+        # اما فعلاً کد کشور را به عنوان نام نمایش می‌دهیم
+        country_name = country_code  # یا می‌توان از دیکشنری نام کشورها استفاده کرد
+        # کش هم می‌کنیم تا دوباره محاسبه نشود
+        ip_address = get_client_ip(request)
+        async with IP_CACHE_LOCK:
+            IP_CACHE[ip_address] = (time.time(), country_name, emoji)
+        return country_name, emoji
 
+    # ۲. در غیر این صورت از روش قبلی (IP-API) استفاده کن
+    ip_address = get_client_ip(request)
     async with IP_CACHE_LOCK:
         if ip_address in IP_CACHE:
             cached_time, country, emoji = IP_CACHE[ip_address]
@@ -318,16 +338,13 @@ async def get_client_country(request: Request) -> tuple[str, str]:
                     emoji = COUNTRY_EMOJIS.get(country, COUNTRY_EMOJIS.get(country_code, "🌍"))
                     async with IP_CACHE_LOCK:
                         IP_CACHE[ip_address] = (time.time(), country, emoji)
-                    logger.info(f"Detected country for IP {ip_address}: {country} {emoji}")
                     return country, emoji
     except Exception as e:
         logger.warning(f"Failed to get country for IP {ip_address}: {e}")
 
     async with IP_CACHE_LOCK:
         IP_CACHE[ip_address] = (time.time(), "Unknown", "🌍")
-
     return "Unknown", "🌍"
-
 def get_random_decorative_emoji() -> str:
     return random.choice(DECORATIVE_EMOJIS)
 

@@ -3475,10 +3475,7 @@ SUB_USER_HTML = r"""<!DOCTYPE html>
                     <span class="detail-label text-[10px] sm:text-xs text-slate-400 font-medium uppercase tracking-wider font-english">Expiry</span>
                     <span class="detail-value text-xs sm:text-sm font-mono text-rose-300 font-semibold font-english" id="expiryValue">%%EXPIRY%%</span>
                 </div>
-                <div class="detail-row flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 px-1 rounded-lg gap-1 sm:gap-0">
-                    <span class="detail-label text-[10px] sm:text-xs text-slate-400 font-medium uppercase tracking-wider font-english">IP(s) Connected</span>
-                    <span class="detail-value text-xs sm:text-sm font-mono text-cyan-300 font-english" id="ipsValue">%%IPS%%</span>
-                </div>
+            
             </div>
 
             <!-- ===== LINKS SECTION ===== -->
