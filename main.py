@@ -11,6 +11,7 @@ from urllib.parse import quote, parse_qs
 from collections import deque, defaultdict
 from pathlib import Path
 import random
+import socket  # 👈 new import for health check
 
 import psutil
 from typing import Optional
@@ -24,7 +25,10 @@ import re
 
 from qr_generator import generate_qr_base64
 from pages import SETUP_HTML, LOGIN_HTML, DASHBOARD_HTML, SUB_USER_HTML, SUB_INFO_HTML
-from ip_suggest import get_random_ips   # <-- NEW import
+from ip_suggest import get_random_ips
+
+# For concurrent TCP tests
+from concurrent.futures import ThreadPoolExecutor
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("MX-UI")
@@ -597,7 +601,7 @@ async def ensure_default_link():
             uid = f"{uid[:8]}-{uid[8:12]}-{uid[12:16]}-{uid[16:20]}-{uid[20:32]}"
             if uid not in LINKS:
                 LINKS[uid] = {
-                    "label": "🌍 ♾️ Default Link ∞ 🐢",
+                    "label": "🌍 Default Link ∞ 🐢",
                     "limit_bytes": 0,
                     "used_bytes": 0,
                     "created_at": datetime.now().isoformat(),
@@ -1519,7 +1523,10 @@ async def reset_link_traffic(uid: str, _=Depends(require_auth)):
     log_activity("link", f"Traffic reset for «{label}»", "info")
     return {"ok": True, "message": f"Traffic reset for {label}"}
 
-# ----- NEW IP SUGGESTION ENDPOINTS -----
+# ============================================================
+# IP SUGGESTIONS ENDPOINTS (added earlier)
+# ============================================================
+
 @app.get("/api/ips/suggest")
 async def suggest_ips(_=Depends(require_auth)):
     """Return up to 10 random IPs from the static list."""
@@ -1578,7 +1585,86 @@ async def apply_ips(request: Request, _=Depends(require_auth)):
 
     return {"ok": True, "applied": applied}
 
-# ---------- Existing relay and proxy routes ----------
+# ============================================================
+# CONFIG HEALTH CHECK ENDPOINT (NEW)
+# ============================================================
+
+# Thread pool for concurrent TCP tests
+_executor = ThreadPoolExecutor(max_workers=20)
+
+def _tcp_test(ip: str, port: int, timeout: float):
+    """Return connection time in ms if successful, else None"""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        start = time.time()
+        result = sock.connect_ex((ip, port))
+        elapsed = (time.time() - start) * 1000
+        sock.close()
+        if result == 0:
+            return elapsed
+        return None
+    except:
+        return None
+
+@app.post("/api/configs/test")
+async def test_configs(request: Request, _=Depends(require_auth)):
+    body = await request.json()
+    uuids = body.get("uuids", [])
+    if not uuids:
+        raise HTTPException(status_code=400, detail="No UUIDs provided")
+
+    results = {}
+    async with LINKS_LOCK:
+        for uid in uuids:
+            link = LINKS.get(uid)
+            if not link:
+                results[uid] = {"healthy": False, "latency": None, "error": "Config not found"}
+                continue
+
+            if not is_link_allowed(link):
+                results[uid] = {"healthy": False, "latency": None, "error": "Inactive/expired/quota exceeded"}
+                continue
+
+            # Determine targets to test: ip_pool + fallback domain
+            targets = []
+            pool = link.get("ip_pool", [])
+            for entry in pool:
+                ip = entry.get("ip")
+                port = entry.get("port", 443)
+                if ip:
+                    targets.append((ip, port))
+            # If no ip_pool, use the host (domain)
+            if not targets:
+                # Use the public domain from the config
+                host = get_host(request)
+                targets.append((host, DEFAULT_PORT))
+
+            # Test each target with a TCP connection
+            healthy = False
+            latency = None
+            error = None
+            for ip, port in targets:
+                try:
+                    loop = asyncio.get_event_loop()
+                    conn_time = await loop.run_in_executor(_executor, _tcp_test, ip, port, 3.0)
+                    if conn_time is not None:
+                        healthy = True
+                        latency = conn_time
+                        break
+                except Exception as e:
+                    error = str(e)
+                    continue
+            if not healthy:
+                error = error or "All targets unreachable"
+            results[uid] = {"healthy": healthy, "latency": latency, "error": error}
+
+    return {"results": results}
+
+# ============================================================
+# PROXY AND ROUTING (unchanged)
+# ============================================================
+
 from relay_vless import websocket_tunnel
 app.add_api_websocket_route("/ws/{uuid}", websocket_tunnel)
 
