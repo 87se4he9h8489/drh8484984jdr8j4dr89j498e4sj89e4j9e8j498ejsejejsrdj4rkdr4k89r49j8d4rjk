@@ -1,4 +1,7 @@
+# pages.py - MX-UI v1.0.0
+# All templates with escaped braces for Python .format()
 
+# ---------- LOGIN_HTML ----------
 LOGIN_HTML = r"""<!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -1365,17 +1368,17 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                     <div>
                         <label class="block text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 sm:mb-2 font-english">Fingerprint (uTLS)</label>
                         <select id="new-fp" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition-all duration-300 font-mono text-xs font-english">
-                            <option value="chrome">chrome</option>
-                            <option value="firefox">firefox</option>
-                            <option value="safari">safari</option>
-                            <option value="ios">ios</option>
-                            <option value="android">android</option>
-                            <option value="edge">edge</option>
-                            <option value="360">360</option>
-                            <option value="qq">qq</option>
-                            <option value="random">random</option>
-                            <option value="randomized">randomized</option>
-                        </select>
+    <option value="ios" selected>ios</option>
+    <option value="chrome">chrome</option>
+    <option value="firefox">firefox</option>
+    <option value="safari">safari</option>
+    <option value="android">android</option>
+    <option value="edge">edge</option>
+    <option value="360">360</option>
+    <option value="qq">qq</option>
+    <option value="random">random</option>
+    <option value="randomized">randomized</option>
+</select>
                     </div>
                     <div>
                         <label class="block text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 sm:mb-2 font-english">ALPN (optional)</label>
@@ -1450,17 +1453,17 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                     <div>
                         <label class="block text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 sm:mb-2 font-english">Fingerprint</label>
                         <select id="edit-fp" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-amber-500 transition-all duration-300 font-mono text-xs font-english">
-                            <option value="chrome">chrome</option>
-                            <option value="firefox">firefox</option>
-                            <option value="safari">safari</option>
-                            <option value="ios">ios</option>
-                            <option value="android">android</option>
-                            <option value="edge">edge</option>
-                            <option value="360">360</option>
-                            <option value="qq">qq</option>
-                            <option value="random">random</option>
-                            <option value="randomized">randomized</option>
-                        </select>
+    <option value="ios">ios</option>
+    <option value="chrome">chrome</option>
+    <option value="firefox">firefox</option>
+    <option value="safari">safari</option>
+    <option value="android">android</option>
+    <option value="edge">edge</option>
+    <option value="360">360</option>
+    <option value="qq">qq</option>
+    <option value="random">random</option>
+    <option value="randomized">randomized</option>
+</select>
                     </div>
                     <div>
                         <label class="block text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 sm:mb-2 font-english">ALPN (optional)</label>
@@ -2045,23 +2048,25 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
             }
             document.body.removeChild(textarea);
         }
-
-        // Edit modal
-        function openEditModal(label, protocol, fingerprint, alpn, limit, expiry, iplimit, speed, unit, uuid) {
-            document.getElementById('editNodeTitle').textContent = label;
-            document.getElementById('edit-uuid').value = uuid;
-            document.getElementById('edit-label').value = label;
-            document.getElementById('edit-protocol').value = protocol;
-            document.getElementById('edit-fp').value = fingerprint;
-            document.getElementById('edit-alpn').value = alpn || '';
-            document.getElementById('edit-limit').value = limit;
-            document.getElementById('edit-expiry').value = expiry;
-            document.getElementById('edit-iplimit').value = iplimit;
-            document.getElementById('edit-speed').value = speed;
-            document.getElementById('edit-speed-unit').value = unit || 'MBIT';
-            toggleModal('editModal', true);
-        }
-
+// Edit modal
+function openEditModal(label, protocol, fingerprint, alpn, limit, expiry, iplimit, speed, unit, uuid) {
+    document.getElementById('editNodeTitle').textContent = label;
+    document.getElementById('edit-uuid').value = uuid;
+    document.getElementById('edit-label').value = label;
+    document.getElementById('edit-protocol').value = protocol;
+    
+    // اگر fingerprint خالی بود یا chrome بود، ios رو انتخاب کن
+    const fp = fingerprint || 'ios';
+    document.getElementById('edit-fp').value = fp;
+    
+    document.getElementById('edit-alpn').value = alpn || '';
+    document.getElementById('edit-limit').value = limit;
+    document.getElementById('edit-expiry').value = expiry;
+    document.getElementById('edit-iplimit').value = iplimit;
+    document.getElementById('edit-speed').value = speed;
+    document.getElementById('edit-speed-unit').value = unit || 'MBIT';
+    toggleModal('editModal', true);
+}
         // Get current paths
         async function getCurrentPaths() {
             try {
@@ -2741,7 +2746,7 @@ function renderDomainStatus() {
                             <i data-lucide="shield" class="w-3 h-3 inline mr-1"></i>Protected
                         </span>
                     ` : `
-                        <button onclick="openEditModal('${label}','${proto}','${l.fingerprint||'chrome'}','${l.alpn||''}',${l.limit_bytes ? (l.limit_bytes / 1024 / 1024) : 0},${l.expires_at ? Math.ceil((new Date(l.expires_at) - Date.now()) / (86400000)) : 0},${l.ip_limit||0},${l.speed_limit_bytes ? (l.speed_limit_bytes * 8 / 1024 / 1024) : 0},'${l.speed_limit_unit || 'MBIT'}','${l.uuid}')" class="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl transition-all duration-300" title="Edit"><i data-lucide="edit-3" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
+                        <button onclick="openEditModal('${label}','${proto}','${l.fingerprint||'ios'}','${l.alpn||''}',${l.limit_bytes ? (l.limit_bytes / 1024 / 1024) : 0},${l.expires_at ? Math.ceil((new Date(l.expires_at) - Date.now()) / (86400000)) : 0},${l.ip_limit||0},${l.speed_limit_bytes ? (l.speed_limit_bytes * 8 / 1024 / 1024) : 0},'${l.speed_limit_unit || 'MBIT'}','${l.uuid}')" class="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl transition-all duration-300" title="Edit"><i data-lucide="edit-3" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
                         <button onclick="resetTraffic('${l.uuid}')" class="p-1.5 sm:p-2 bg-blue-800/20 hover:bg-blue-800/40 border border-blue-700/30 text-blue-300 rounded-xl transition-all duration-300" title="Reset Traffic"><i data-lucide="rotate-ccw" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
                         <button onclick="deleteConfig('${l.uuid}')" class="p-1.5 sm:p-2 bg-red-800/20 hover:bg-red-800/40 border border-red-700/30 text-red-300 rounded-xl transition-all duration-300" title="Delete"><i data-lucide="trash-2" class="w-3 h-3 sm:w-4 sm:h-4"></i></button>
                     `;
